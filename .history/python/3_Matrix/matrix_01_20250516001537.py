@@ -1,6 +1,6 @@
 import numpy as np
 
-matrix_dims = 10
+matrix_dims = 11
 center = matrix_dims // 2
 radius = 2
 
