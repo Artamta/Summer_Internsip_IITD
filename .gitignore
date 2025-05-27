@@ -1,1 +1,18 @@
-Datasets/*.nii
+# Ignore everything
+/*
+
+# But not the python directory
+!/python/
+
+# Still ignore any .DS_Store files in the python directory
+python/**/.DS_Store
+
+# Explicitly ignore these directories (redundant with /* but good for clarity)
+/Datasets/
+/Results/
+/refrences/
+/Output_Statistics/
+/Output_Parameter_Maps/
+/IVIM/
+/new_work/
+/clean-repo/
