@@ -20,6 +20,7 @@ def fit_voxelwise_with_tv(image_data, bvals, alpha=0.01):
     D_star_map = np.full(shape, np.nan)
     D_slow_map = np.full(shape, np.nan)
     k_map = np.full(shape, np.nan)
+    aic_map = np.full(shape, np.nan)  # <-- Add this line
     # Initial guesses and bounds
     bounds = ([0, 0, 0, 0], [1, 0.5, 0.005, 3])
     p0 = [0.1, 0.01, 0.001, 0.7]
@@ -31,6 +32,15 @@ def fit_voxelwise_with_tv(image_data, bvals, alpha=0.01):
         try:
             params, _ = curve_fit(ivim_dki_model, bvals, y, p0=p0, bounds=bounds, maxfev=10000)
             f_map[idx], D_star_map[idx], D_slow_map[idx], k_map[idx] = params
+            # --- Calculate AIC for this voxel ---
+            y_pred = ivim_dki_model(bvals, *params)
+            residuals = y - y_pred
+            rss = np.sum(residuals ** 2)
+            n = len(y)
+            k_param = len(params)
+            if rss > 0 and n > 0:
+                aic = n * np.log(rss / n) + 2 * k_param
+                aic_map[idx] = aic
         except Exception:
             continue
     # Apply simple TV smoothing to each map
@@ -52,7 +62,8 @@ def fit_voxelwise_with_tv(image_data, bvals, alpha=0.01):
     print(f"D_star_map min/max: {np.nanmin(D_star_map_smooth):.4f} / {np.nanmax(D_star_map_smooth):.4f}")
     print(f"D_slow_map min/max: {np.nanmin(D_slow_map_smooth):.6f} / {np.nanmax(D_slow_map_smooth):.6f}")
     print(f"k_map min/max: {np.nanmin(k_map_smooth):.4f} / {np.nanmax(k_map_smooth):.4f}")
-    return f_map_smooth, D_star_map_smooth, D_slow_map_smooth, k_map_smooth
+    print(f"AIC min/max: {np.nanmin(aic_map):.2f} / {np.nanmax(aic_map):.2f}")  # <-- Add this line
+    return f_map_smooth, D_star_map_smooth, D_slow_map_smooth, k_map_smooth, aic_map
 
 # --- Load data ---
 nii_file_path = "/Users/ayush/Desktop/project-internsip/new_work/OneDrive_2_23-05-2025/Simulation-III_Nifty-data/Simulation-III_SNR15/Data-1_Simulation-III_SNR-15.nii"
