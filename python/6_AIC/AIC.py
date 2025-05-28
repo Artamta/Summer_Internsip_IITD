@@ -1,42 +1,61 @@
 import numpy as np
 import nibabel as nb
 from scipy.optimize import curve_fit
-from lmfit import Model
 
-# Load your .nii image (example: take mean signal as y_data)
-nii = nb.load("/Users/ayush/Desktop/project-internsip/new_work/OneDrive_2_23-05-2025/Simulation-III_Nifty-data/Simulation-III_SNR15/Data-1_Simulation-III_SNR-15.nii")
-data = nii.get_fdata()
-y_data = np.mean(data, axis=(0, 1, 2))  # Example: mean signal per volume
+def ivim_model(b, f, D_star, D_slow):
+    return f * np.exp(-b * D_star) + (1 - f) * np.exp(-b * D_slow)
 
-# Example b-values (replace with your actual b-values)
-b_values = np.array([0, 50, 100, 200, 400, 800])
+nii_file_path = "/Users/ayush/Desktop/project-internsip/new_work/OneDrive_2_23-05-2025/Simulation-III_Nifty-data/Simulation-III_SNR15/Data-1_Simulation-III_SNR-15.nii"
+nifti_image = nb.load(nii_file_path)
+print(f"NIfTI image shape: {nifti_image.shape}")
+image_data = nifti_image.get_fdata()
+b_values_array = np.array([0, 25, 50, 75, 100, 150, 200, 500, 800, 1000, 1250, 1500, 2000])
 
-# Ensure y_data and b_values have the same length
-y_data = y_data[:len(b_values)]
+image_shape_3d = image_data.shape[:3]
+f_map = np.full(image_shape_3d, np.nan)
+D_star_map = np.full(image_shape_3d, np.nan)
+D_slow_map = np.full(image_shape_3d, np.nan)
+aic_map = np.full(image_shape_3d, np.nan)
 
-# IVIM model function
-def ivim(b, f, Dstar, D):
-    return f * np.exp(-b * Dstar) + (1 - f) * np.exp(-b * D)
+parameter_bounds = ([0, 0.005, 0], [0.5, 0.1, 0.005])
+initial_guesses = [0.1, 0.015, 0.001]
 
-# Fit using scipy.optimize.curve_fit
-popt, pcov = curve_fit(ivim, b_values, y_data, bounds=([0, 0, 0], [1, 0.1, 0.01]))
-residuals = y_data - ivim(b_values, *popt)
-rss = np.sum(residuals**2)
-k = len(popt)
-n = len(y_data)
-aic = 2 * k + n * np.log(rss / n)
-print("AIC (scipy.optimize):", aic)
+num_voxels_x, num_voxels_y, num_voxels_z = image_shape_3d
 
-# Fit using lmfit
-ivim_model = Model(ivim)
-params = ivim_model.make_params(f=0.1, Dstar=0.01, D=0.001)
-params['f'].min = 0
-params['f'].max = 1
-params['Dstar'].min = 0
-params['Dstar'].max = 0.1
-params['D'].min = 0
-params['D'].max = 0.01
+for x in range(num_voxels_x):
+    for y in range(num_voxels_y):
+        for z in range(num_voxels_z):
+            voxel_signal = image_data[x, y, z, :]
+            if np.any(voxel_signal > 0) and voxel_signal[0] != 0:
+                norm_signal = voxel_signal / voxel_signal[0]
+                try:
+                    params, _ = curve_fit(
+                        ivim_model,
+                        b_values_array,
+                        norm_signal,
+                        p0=initial_guesses,
+                        bounds=parameter_bounds
+                    )
+                    pred = ivim_model(b_values_array, *params)
+                    rss = np.sum((norm_signal - pred) ** 2)
+                    n = len(norm_signal)
+                    k = len(params)
+                    aic = 2 * k + n * np.log(rss / n) if rss > 0 and n > 0 else np.nan
+                    f_map[x, y, z] = params[0]
+                    D_star_map[x, y, z] = params[1]
+                    D_slow_map[x, y, z] = params[2]
+                    aic_map[x, y, z] = aic
+                except Exception:
+                    pass
 
-result = ivim_model.fit(y_data, params, b=b_values)
-print("AIC (lmfit):", result.aic)
-print(result.fit_report())
+print("Voxel-wise IVIM fitting complete.")
+num_fitted = np.sum(~np.isnan(f_map))
+print(f"Number of voxels fitted: {num_fitted} out of {f_map.size}")
+
+if num_fitted > 0:
+    print(f"f_map min/max: {np.nanmin(f_map):.4f} / {np.nanmax(f_map):.4f}")
+    print(f"D_star_map min/max: {np.nanmin(D_star_map):.4f} / {np.nanmax(D_star_map):.4f}")
+    print(f"D_slow_map min/max: {np.nanmin(D_slow_map):.6f} / {np.nanmax(D_slow_map):.6f}")
+    print(f"AIC_map min/max: {np.nanmin(aic_map):.2f} / {np.nanmax(aic_map):.2f}")
+else:
+    print("No voxels were successfully fitted. Check data, b-values, bounds, or initial guesses.")
