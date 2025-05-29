@@ -6,11 +6,14 @@ import matplotlib.pyplot as plt
 
 # 1. Define the IVIM-DKI model with clamping for numerical stability
 def ivim_dki_model(b_values, f, D_star, D_slow, k):
-    # IVIM-DKI hybrid model: S/S0 = f*exp(-b*D*) + (1-f)*exp(-b*D + (1/6)*b^2*D^2*k)
     exp1 = np.exp(np.clip(-b_values * D_star, -100, 100))
     exp2 = np.exp(np.clip(-b_values * D_slow + (1/6) * (b_values ** 2) * (D_slow ** 2) * k, -100, 100))
     result = f * exp1 + (1 - f) * exp2
     return np.clip(result, 0, 2)
+
+# Utility to replace NaNs with zeros for NIfTI saving
+def safe_for_nifti(arr):
+    return np.nan_to_num(arr, nan=0.0)
 
 # 2. Load the NIfTI file and check data
 nii_file_path = "/Users/ayush/Desktop/project-internsip/new_work/OneDrive_2_23-05-2025/Simulation-III_Nifty-data/Simulation-III_SNR60/Data-1_Simulation-III_SNR-60.nii"
@@ -131,28 +134,29 @@ def plot_map(map_data, title, cmap='viridis'):
     plt.colorbar()
     plt.title(title)
     plt.axis('off')
-    
+
 if num_fitted_voxels > 0:
     plot_map(f_map, "f_map (Perfusion Fraction)")
     plot_map(D_star_map, "D*_map (Pseudo-diffusion)")
     plot_map(D_slow_map, "D_slow_map (True Diffusion)")
     plot_map(k_map, "k_map (Kurtosis)")
     plot_map(aic_map, "AIC_map (Model AIC)", cmap='hot')
+    plt.show()
 
 # 10. Save all parameter maps as NIfTI files, with confirmation prints
 output_dir = "/Users/ayush/Desktop/project-internsip/Results/6_Aic_CALC"
 os.makedirs(output_dir, exist_ok=True)
 affine = nifti_image.affine
 
-nb.Nifti1Image(D_slow_map, affine).to_filename(os.path.join(output_dir, "D.nii.gz"))
+nb.Nifti1Image(safe_for_nifti(D_slow_map), affine).to_filename(os.path.join(output_dir, "D.nii.gz"))
 print("Saved D.nii.gz")
-nb.Nifti1Image(D_star_map, affine).to_filename(os.path.join(output_dir, "Dstar.nii.gz"))
+nb.Nifti1Image(safe_for_nifti(D_star_map), affine).to_filename(os.path.join(output_dir, "Dstar.nii.gz"))
 print("Saved Dstar.nii.gz")
-nb.Nifti1Image(f_map, affine).to_filename(os.path.join(output_dir, "f.nii.gz"))
+nb.Nifti1Image(safe_for_nifti(f_map), affine).to_filename(os.path.join(output_dir, "f.nii.gz"))
 print("Saved f.nii.gz")
-nb.Nifti1Image(k_map, affine).to_filename(os.path.join(output_dir, "k.nii.gz"))
+nb.Nifti1Image(safe_for_nifti(k_map), affine).to_filename(os.path.join(output_dir, "k.nii.gz"))
 print("Saved k.nii.gz")
-nb.Nifti1Image(aic_map, affine).to_filename(os.path.join(output_dir, "AIC.nii.gz"))
+nb.Nifti1Image(safe_for_nifti(aic_map), affine).to_filename(os.path.join(output_dir, "AIC.nii.gz"))
 print("Saved AIC.nii.gz")
 
 print(f"Parameter maps saved to {output_dir}")

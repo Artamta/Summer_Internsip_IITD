@@ -13,3 +13,6 @@ To display the parameter maps (f_map, D_star_map, D_slow_map, k_map, aic_map) as
 
  3 subplots
     -->f-ori+vox+tv
+
+
+-> I am getting diffrent scaled values for both 
