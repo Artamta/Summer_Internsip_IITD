@@ -174,3 +174,5 @@ print_stats("D_star_map", D_star_map)
 print_stats("D_slow_map", D_slow_map)
 print_stats("k_map", k_map)
 print_stats("AIC_map", aic_map)
+
+print("hello world")
