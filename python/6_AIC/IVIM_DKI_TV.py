@@ -22,8 +22,8 @@ def fit_voxelwise_with_tv(image_data, bvals, alpha=0.01):
     k_map = np.full(shape, np.nan)
     aic_map = np.full(shape, np.nan)  # <-- Add this line
     # Initial guesses and bounds
-    bounds = ([0, 0, 0, 0], [1, 0.5, 0.005, 3])
-    p0 = [0.1, 0.01, 0.001, 0.7]
+    bounds = ([0.0001, 0.0001, 0.001, 0.01], [0.05, 0.5, 1, 3])
+    p0 = [0.0008,0.00913,0.12,0.9]
     # Fit each voxel independently
     for idx in zip(*np.where(mask)):
         y = image_data[idx]

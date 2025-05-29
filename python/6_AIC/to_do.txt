@@ -1,0 +1,15 @@
+methods{1.voxel_mycode
+2.toolboxcode)
+
+calculate aic for both
+ f method 1 & method 2
+ and cal all values and fill in exel--
+
+GitHub Copilot
+To display the parameter maps (f_map, D_star_map, D_slow_map, k_map, aic_map) as 2D slices from the 3D volumes, you can visualize the middle slice of each map. Here’s how you can add this to the end of your script:
+
+
+ all & aic 
+
+ 3 subplots
+    -->f-ori+vox+tv
