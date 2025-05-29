@@ -23,7 +23,7 @@ aic_map = np.full(image_shape_3d, np.nan)
 
 # Bounds and initial guesses for [f, D*, D, k]
 parameter_bounds = ([0.0001, 0.0001, 0.001, 0.01], [0.05, 0.5, 1, 3])
-initial_guesses = [0.0013,0.013,0.23,1.1]
+initial_guesses = [0.01, 0.01, 0.01, 0.1]
 
 num_voxels_x, num_voxels_y, num_voxels_z = image_shape_3d
 
