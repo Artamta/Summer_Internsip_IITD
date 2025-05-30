@@ -6,22 +6,25 @@ import matplotlib.pyplot as plt
 
 # 1. Define the IVIM-DKI model with clamping for numerical stability
 def ivim_dki_model(b_values, f, D_star, D_slow, k):
+    """
+    IVIM-DKI signal model.
+    """
     exp1 = np.exp(np.clip(-b_values * D_star, -100, 100))
     exp2 = np.exp(np.clip(-b_values * D_slow + (1/6) * (b_values ** 2) * (D_slow ** 2) * k, -100, 100))
     result = f * exp1 + (1 - f) * exp2
     return np.clip(result, 0, 2)
 
-# Utility to replace NaNs with zeros for NIfTI saving
+# 2. Utility to replace NaNs with zeros for NIfTI saving
 def safe_for_nifti(arr):
     return np.nan_to_num(arr, nan=0.0)
 
-# 2. Load the NIfTI file and check data
+# 3. Load the NIfTI file and check data
 nii_file_path = "/Users/ayush/Desktop/project-internsip/new_work/OneDrive_2_23-05-2025/Simulation-III_Nifty-data/Simulation-III_SNR60/Data-1_Simulation-III_SNR-60.nii"
 nifti_image = nb.load(nii_file_path)
-print(f"NIfTI image shape: {nifti_image.shape}")
 image_data = nifti_image.get_fdata()
+print(f"NIfTI image shape: {nifti_image.shape}")
 
-# 3. Basic data checks
+# 4. Basic data checks
 print("Any NaNs in data?", np.isnan(image_data).any())
 print("Any Infs in data?", np.isinf(image_data).any())
 if image_data.ndim != 4:
@@ -29,13 +32,13 @@ if image_data.ndim != 4:
 
 b_values_array = np.array([0, 25, 50, 75, 100, 150, 200, 500, 800, 1000, 1250, 1500, 2000])
 
-# 4. Print a sample voxel's signal for debugging
+# 5. Print a sample voxel's signal for debugging
 print("Sample voxel [55,55,5,:] signal:", image_data[55, 55, 5, :])
 b0 = image_data[..., 0]
 print("b=0 min:", np.min(b0), "max:", np.max(b0), "mean:", np.mean(b0))
 print("Number of voxels with b=0 == 0:", np.sum(b0 == 0))
 
-# 5. Prepare output arrays
+# 6. Prepare output arrays for parameter maps and AIC
 image_shape_3d = image_data.shape[:3]
 f_map = np.full(image_shape_3d, np.nan)
 D_star_map = np.full(image_shape_3d, np.nan)
@@ -43,13 +46,13 @@ D_slow_map = np.full(image_shape_3d, np.nan)
 k_map = np.full(image_shape_3d, np.nan)
 aic_map = np.full(image_shape_3d, np.nan)
 
-# 6. Set bounds and initial guesses (as per supervisor)
+# 7. Set bounds and initial guesses (as per supervisor's suggestion)
 parameter_bounds = ([0.0001, 0.0001, 0.001, 0.01], [0.05, 0.5, 1, 3])
 initial_guesses = [0.013, 0.013, 0.23, 1.1]
 
 num_voxels_x, num_voxels_y, num_voxels_z = image_shape_3d
 
-# 7. Try fitting a single voxel for debugging
+# 8. Try fitting a single voxel for debugging
 test_voxel = (55, 55, 5)
 signal = image_data[test_voxel[0], test_voxel[1], test_voxel[2], :]
 if signal[0] != 0:
@@ -72,12 +75,13 @@ if signal[0] != 0:
     except Exception as e:
         print(f"Single voxel fit failed at {test_voxel}: {e}")
 
-# 8. Main voxel-wise fitting loop
+# 9. Main voxel-wise fitting loop
 fit_fail_count = 0
 for x_idx in range(num_voxels_x):
     for y_idx in range(num_voxels_y):
         for z_idx in range(num_voxels_z):
             voxel_signal_decay = image_data[x_idx, y_idx, z_idx, :]
+            # Only fit if there is signal and b=0 is not zero
             if np.any(voxel_signal_decay > 0) and voxel_signal_decay[0] != 0:
                 y = voxel_signal_decay / voxel_signal_decay[0]
                 if np.isnan(y).any() or np.isinf(y).any():
@@ -102,6 +106,7 @@ for x_idx in range(num_voxels_x):
                     n = len(y)
                     k_param = len(fitted_params)
                     aic = 2 * k_param + n * np.log(rss / n) if rss > 0 and n > 0 else np.nan
+                    # Store fitted parameters and AIC
                     f_map[x_idx, y_idx, z_idx] = fitted_params[0]
                     D_star_map[x_idx, y_idx, z_idx] = fitted_params[1]
                     D_slow_map[x_idx, y_idx, z_idx] = fitted_params[2]
@@ -116,6 +121,7 @@ num_fitted_voxels = np.sum(~np.isnan(f_map))
 print(f"Number of voxels fitted: {num_fitted_voxels} / {f_map.size}")
 print(f"Total fit failures: {fit_fail_count}")
 
+# 10. Print parameter map statistics for quality check
 if num_fitted_voxels > 0:
     print(f"f_map min/max: {np.nanmin(f_map):.4f} / {np.nanmax(f_map):.4f}")
     print(f"D_star_map min/max: {np.nanmin(D_star_map):.4f} / {np.nanmax(D_star_map):.4f}")
@@ -125,7 +131,7 @@ if num_fitted_voxels > 0:
 else:
     print("No voxels were successfully fitted. Check data, b-values, bounds, or initial guesses.")
 
-# 9. Plot central slice of each map for visual inspection
+# 11. Plot central slice of each map for visual inspection
 slice_idx = num_voxels_z // 2
 
 def plot_map(map_data, title, cmap='viridis'):
@@ -143,7 +149,7 @@ if num_fitted_voxels > 0:
     plot_map(aic_map, "AIC_map (Model AIC)", cmap='hot')
     plt.show()
 
-# 10. Save all parameter maps as NIfTI files, with confirmation prints
+# 12. Save all parameter maps as NIfTI files, with confirmation prints
 output_dir = "/Users/ayush/Desktop/project-internsip/Results/6_Aic_CALC"
 os.makedirs(output_dir, exist_ok=True)
 affine = nifti_image.affine
@@ -161,7 +167,7 @@ print("Saved AIC.nii.gz")
 
 print(f"Parameter maps saved to {output_dir}")
 
-# 11. Print statistics for quality check
+# 13. Print statistics for quality check
 def print_stats(name, arr):
     print(f"{name}: min={np.nanmin(arr):.4f}, max={np.nanmax(arr):.4f}, mean={np.nanmean(arr):.4f}, std={np.nanstd(arr):.4f}")
 
