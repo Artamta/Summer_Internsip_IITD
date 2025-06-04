@@ -9,7 +9,7 @@ b_values_array = np.array([0, 25, 50, 75, 100, 150, 200, 500, 800, 1000, 1250, 1
 toolbox_dir = "/Users/ayush/Desktop/project-internsip/Output_Parameter_Maps"
 my_dir = "/Users/ayush/Desktop/project-internsip/Results/6_Aic_CALC"
 
-# Load parameter maps
+# Loading parameter maps
 f_toolbox = nb.load(f"{toolbox_dir}/Data-1_Simulation-III_SNR-60_f.nii").get_fdata()
 Dstar_toolbox = nb.load(f"{toolbox_dir}/Data-1_Simulation-III_SNR-60_D_star.nii").get_fdata()
 Dslow_toolbox = nb.load(f"{toolbox_dir}/Data-1_Simulation-III_SNR-60_D.nii").get_fdata()
@@ -38,7 +38,7 @@ num_voxels_x, num_voxels_y, num_voxels_z = shape
 n = len(b_values_array)
 k_param = 4
 
-# --- Robust mask: valid signal and valid parameters for both methods ---
+# --- mask:
 signal_mask = image_data[..., 0] > 0
 param_mask_toolbox = np.isfinite(f_toolbox) & np.isfinite(Dstar_toolbox) & np.isfinite(Dslow_toolbox) & np.isfinite(k_toolbox)
 param_mask_my = np.isfinite(f_my) & np.isfinite(Dstar_my) & np.isfinite(Dslow_my) & np.isfinite(k_my)
@@ -100,7 +100,7 @@ def print_f_metrics(ref_data, est_data, mask, label):
     print(f"{label} Relative Bias (%): {rel_bias:.2f}")
     print(f"{label} Relative Parameter: {rel_param:.4f}")
 
-# Reference f_map (from simulation ground truth)
+# Reference f_map 
 ref_f_path = "/Users/ayush/Desktop/project-internsip/new_work/OneDrive_2_23-05-2025/Simulation-III_Nifty-data/Simulation-III_f_map.nii"
 ref_f_data = nb.load(ref_f_path).get_fdata()
 
