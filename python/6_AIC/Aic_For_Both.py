@@ -1,8 +1,6 @@
 import numpy as np
 import nibabel as nb
 import matplotlib.pyplot as plt
-from scipy.optimize import curve_fit
-from scipy.special import expit, logit
 
 # --- File paths ---
 nii_file_path = "/Users/ayush/Desktop/project-internsip/new_work/OneDrive_2_23-05-2025/Simulation-III_Nifty-data/Simulation-III_SNR60/Data-1_Simulation-III_SNR-60.nii"
@@ -10,151 +8,123 @@ b_values_array = np.array([0, 25, 50, 75, 100, 150, 200, 500, 800, 1000, 1250, 1
 
 toolbox_dir = "/Users/ayush/Desktop/project-internsip/Output_Parameter_Maps"
 my_dir = "/Users/ayush/Desktop/project-internsip/Results/6_Aic_CALC"
-ref_f_path = "/Users/ayush/Desktop/project-internsip/new_work/OneDrive_2_23-05-2025/Simulation-III_Nifty-data/Simulation-III_f_map.nii"
 
-# --- Load parameter maps ---
+# Loading parameter maps
 f_toolbox = nb.load(f"{toolbox_dir}/Data-1_Simulation-III_SNR-60_f.nii").get_fdata()
 Dstar_toolbox = nb.load(f"{toolbox_dir}/Data-1_Simulation-III_SNR-60_D_star.nii").get_fdata()
 Dslow_toolbox = nb.load(f"{toolbox_dir}/Data-1_Simulation-III_SNR-60_D.nii").get_fdata()
 k_toolbox = nb.load(f"{toolbox_dir}/Data-1_Simulation-III_SNR-60_k.nii").get_fdata()
 
-# --- Load original 4D data ---
+f_my = nb.load(f"{my_dir}/f.nii.gz").get_fdata()
+Dstar_my = nb.load(f"{my_dir}/Dstar.nii.gz").get_fdata()
+Dslow_my = nb.load(f"{my_dir}/D.nii.gz").get_fdata()
+k_my = nb.load(f"{my_dir}/k.nii.gz").get_fdata()
+
 image_data = nb.load(nii_file_path).get_fdata()
-shape = image_data.shape[:3]
 
-# --- Logit/log-scale IVIM-DKI model for fitting ---
-def ivim_dki_model_log(b, logit_f, log_D_star, log_D_slow, log_k):
-    f = expit(logit_f)  # ensures 0 < f < 1
-    D_star = np.exp(log_D_star)
-    D_slow = np.exp(log_D_slow)
-    k = np.exp(log_k)
-    exp1 = np.exp(np.clip(-b * D_star, -100, 100))
-    exp2 = np.exp(np.clip(-b * D_slow + (1/6) * (b ** 2) * (D_slow ** 2) * k, -100, 100))
-    return f * exp1 + (1 - f) * exp2
+# --- IVIM-DKI model ---
+def ivim_dki_model(b_values, f, D_star, D_slow, k):
+    exp1 = np.exp(np.clip(-b_values * D_star, -100, 100))
+    exp2 = np.exp(np.clip(-b_values * D_slow + (1/6) * (b_values ** 2) * (D_slow ** 2) * k, -100, 100))
+    result = f * exp1 + (1 - f) * exp2
+    return np.clip(result, 0, 2)
 
-# --- Tighter bounds and lower initial guess for f ---
-p0 = [logit(0.07), np.log(0.013), np.log(0.23), np.log(1.1)]
-bounds = ([logit(0.01), np.log(0.0001), np.log(0.001), np.log(0.01)],
-          [logit(0.3), np.log(0.5), np.log(1), np.log(3)])
+shape = f_toolbox.shape
+aic_toolbox = np.full(shape, np.nan)
+aic_my = np.full(shape, np.nan)
+rss_toolbox_map = np.full(shape, np.nan)
+rss_my_map = np.full(shape, np.nan)
+num_voxels_x, num_voxels_y, num_voxels_z = shape
+n = len(b_values_array)
+k_param = 4
 
-# --- Voxelwise logit/log-scale fitting with RSS masking ---
-f_my = np.full(shape, np.nan)
-Dstar_my = np.full(shape, np.nan)
-Dslow_my = np.full(shape, np.nan)
-k_my = np.full(shape, np.nan)
-
-print("Starting voxelwise logit/log-scale fitting...")
-for x in range(shape[0]):
-    for y in range(shape[1]):
-        for z in range(shape[2]):
-            signal = image_data[x, y, z, :]
-            if np.any(signal > 0) and signal[0] != 0:
-                y_norm = signal / signal[0]
-                if np.any(np.isnan(y_norm)) or np.any(np.isinf(y_norm)):
-                    continue
-                try:
-                    popt, _ = curve_fit(
-                        ivim_dki_model_log, b_values_array, y_norm, p0=p0, bounds=bounds, maxfev=10000
-                    )
-                    y_fit = ivim_dki_model_log(b_values_array, *popt)
-                    rss = np.sum((y_norm - y_fit) ** 2)
-                    # Mask out bad fits (tune threshold as needed)
-                    if rss > 0.1:
-                        continue
-                    f_val = np.clip(expit(popt[0]), 0.01, 0.3)
-                    f_my[x, y, z] = f_val
-                    Dstar_my[x, y, z] = np.exp(popt[1])
-                    Dslow_my[x, y, z] = np.exp(popt[2])
-                    k_my[x, y, z] = np.exp(popt[3])
-                except Exception:
-                    continue
-print("Voxelwise fitting complete.")
-
-# --- Save voxelwise parameter maps (optional) ---
-nb.Nifti1Image(f_my, nb.load(nii_file_path).affine).to_filename(f"{my_dir}/f_logfit.nii.gz")
-nb.Nifti1Image(Dslow_my, nb.load(nii_file_path).affine).to_filename(f"{my_dir}/D_logfit.nii.gz")
-nb.Nifti1Image(Dstar_my, nb.load(nii_file_path).affine).to_filename(f"{my_dir}/Dstar_logfit.nii.gz")
-nb.Nifti1Image(k_my, nb.load(nii_file_path).affine).to_filename(f"{my_dir}/k_logfit.nii.gz")
-
-# --- Mask for error metrics ---
+# --- mask:
 signal_mask = image_data[..., 0] > 0
 param_mask_toolbox = np.isfinite(f_toolbox) & np.isfinite(Dstar_toolbox) & np.isfinite(Dslow_toolbox) & np.isfinite(k_toolbox)
 param_mask_my = np.isfinite(f_my) & np.isfinite(Dstar_my) & np.isfinite(Dslow_my) & np.isfinite(k_my)
 mask = signal_mask & param_mask_toolbox & param_mask_my
 
-# --- Error metrics for f-maps (no normalization) ---
-def error_metrics(ref, est, mask):
-    ref_vals = ref[mask]
-    est_vals = est[mask]
+# --- Calculate AIC and RSS for both methods ---
+for idx in zip(*np.where(mask)):
+    x, y, z = idx
+    signal = image_data[x, y, z, :]
+    y_true = signal / signal[0]
+    if np.isnan(y_true).any() or np.isinf(y_true).any():
+        continue
+    # Toolbox method
+    f, D_star, D_slow, k = f_toolbox[x, y, z], Dstar_toolbox[x, y, z], Dslow_toolbox[x, y, z], k_toolbox[x, y, z]
+    y_pred_toolbox = ivim_dki_model(b_values_array, f, D_star, D_slow, k)
+    rss_toolbox = np.sum((y_true - y_pred_toolbox) ** 2)
+    aic_toolbox[x, y, z] = 2 * k_param + n * np.log(rss_toolbox / n) if rss_toolbox > 0 else np.nan
+    rss_toolbox_map[x, y, z] = rss_toolbox
+    # Voxelwise method
+    f, D_star, D_slow, k = f_my[x, y, z], Dstar_my[x, y, z], Dslow_my[x, y, z], k_my[x, y, z]
+    y_pred_my = ivim_dki_model(b_values_array, f, D_star, D_slow, k)
+    rss_my = np.sum((y_true - y_pred_my) ** 2)
+    aic_my[x, y, z] = 2 * k_param + n * np.log(rss_my / n) if rss_my > 0 else np.nan
+    rss_my_map[x, y, z] = rss_my
+
+# --- Save AIC maps ---
+affine = nb.load(nii_file_path).affine
+nb.Nifti1Image(np.nan_to_num(aic_toolbox, nan=0.0), affine).to_filename(
+    f"{toolbox_dir}/Data-1_Simulation-III_SNR-60_AIC.nii"
+)
+nb.Nifti1Image(np.nan_to_num(aic_my, nan=0.0), affine).to_filename(
+    f"{my_dir}/AIC.nii.gz"
+)
+print("Saved toolbox and voxelwise AIC maps.")
+
+# --- Print mean and max AIC values ---
+mean_aic_toolbox = np.nanmean(aic_toolbox[mask])
+mean_aic_my = np.nanmean(aic_my[mask])
+max_aic_toolbox = np.nanmax(aic_toolbox[mask])
+max_aic_my = np.nanmax(aic_my[mask])
+print(f"Mean AIC (toolbox): {mean_aic_toolbox:.2f} | Max: {max_aic_toolbox:.2f}")
+print(f"Mean AIC (voxelwise): {mean_aic_my:.2f} | Max: {max_aic_my:.2f}")
+
+# --- Print mean RSS values ---
+mean_rss_toolbox = np.nanmean(rss_toolbox_map[mask])
+mean_rss_my = np.nanmean(rss_my_map[mask])
+print(f"Mean RSS (toolbox): {mean_rss_toolbox:.4f}")
+print(f"Mean RSS (voxelwise): {mean_rss_my:.4f}")
+
+# --- RMSE, Relative Bias, Relative Parameter for f-maps ---
+def print_f_metrics(ref_data, est_data, mask, label):
+    ref_vals = ref_data[mask]
+    est_vals = est_data[mask]
     rmse = np.sqrt(np.mean((est_vals - ref_vals) ** 2))
     rmse_norm = (rmse / np.mean(ref_vals)) * 100
-    rel_bias = np.mean((est_vals - ref_vals) / ref_vals) * 100
+    rel_bias = (np.mean((est_vals - ref_vals) / (ref_vals)) * 100)
     rel_param = np.mean(est_vals / ref_vals)
-    return rmse_norm, rel_bias, rel_param
+    print(f"{label} RMSE (normalized, %): {rmse_norm:.2f}")
+    print(f"{label} Relative Bias (%): {rel_bias:.2f}")
+    print(f"{label} Relative Parameter: {rel_param:.4f}")
 
-# Reference f_map
+# Reference f_map 
+ref_f_path = "/Users/ayush/Desktop/project-internsip/new_work/OneDrive_2_23-05-2025/Simulation-III_Nifty-data/Simulation-III_f_map.nii"
 ref_f_data = nb.load(ref_f_path).get_fdata()
 
-rmse_toolbox, bias_toolbox, relp_toolbox = error_metrics(ref_f_data, f_toolbox, mask)
-rmse_my, bias_my, relp_my = error_metrics(ref_f_data, f_my, mask)
+print_f_metrics(ref_f_data, f_toolbox, mask, "Toolbox f")
+print_f_metrics(ref_f_data, f_my, mask, "Voxelwise f")
 
-print(f"Toolbox f RMSE (normalized, %): {rmse_toolbox:.2f}")
-print(f"Toolbox f Relative Bias (%): {bias_toolbox:.2f}")
-print(f"Toolbox f Relative Parameter: {relp_toolbox:.4f}")
-print(f"Voxelwise f RMSE (normalized, %): {rmse_my:.2f}")
-print(f"Voxelwise f Relative Bias (%): {bias_my:.2f}")
-print(f"Voxelwise f Relative Parameter: {relp_my:.4f}")
-
-# --- AIC and AICc calculation for f-maps (matches supervisor's reference) ---
-def sim_ivim_dki(b_val, est_d, est_dp, est_f, est_k):
-    y_pred = np.zeros(est_f.shape + (len(b_val),))
-    for idx, b in enumerate(b_val):
-        exp1 = np.exp(np.clip(-b * est_dp, -100, 100))
-        exp2 = np.exp(np.clip(-b * est_d + (1 / 6) * est_k * (b ** 2) * (est_d ** 2), -100, 100))
-        y_pred[..., idx] = (est_f * exp1) + (1 - est_f) * exp2
-    return y_pred
-
-def calc_aic_aicc(D, Dstar, f, k, y_data, bvals):
-    y_pred = sim_ivim_dki(bvals, D, Dstar, f, k)
-    mask = (f > 0)
-    aic_map = np.full(f.shape, np.nan)
-    n = len(bvals)
-    k_param = 4
-    for i in range(f.shape[0]):
-        for j in range(f.shape[1]):
-            for l in range(f.shape[2]):
-                if mask[i, j, l]:
-                    residuals = y_data[i, j, l, :] - y_pred[i, j, l, :]
-                    RSS = np.sum(residuals ** 2)
-                    if RSS > 0:
-                        aic = 2 * k_param + n * np.log(RSS / n)
-                        aicc = aic + (2 * k_param * (k_param + 1)) / (n - k_param - 1)
-                        aic_map[i, j, l] = aicc
-    return aic_map
-
-aic_toolbox = calc_aic_aicc(Dslow_toolbox, Dstar_toolbox, f_toolbox, k_toolbox, image_data, b_values_array)
-aic_my = calc_aic_aicc(Dslow_my, Dstar_my, f_my, k_my, image_data, b_values_array)
-
-print("Toolbox f AICc (mean):", np.nanmean(aic_toolbox))
-print("Voxelwise f AICc (mean):", np.nanmean(aic_my))
-
-# --- Visualization: 3 f-maps as subplots, correct color range ---
+# --- Visualization: masked AIC maps ---
 mid_slice = shape[2] // 2
-plt.figure(figsize=(15, 5))
-plt.subplot(1, 3, 1)
-plt.imshow(ref_f_data[:, :, mid_slice], cmap='jet', vmin=0, vmax=0.3)
-plt.title('Reference f map')
+aic_toolbox_masked = np.where(mask, aic_toolbox, np.nan)
+aic_my_masked = np.where(mask, aic_my, np.nan)
+
+plt.figure(figsize=(12, 5))
+plt.subplot(1, 2, 1)
+plt.imshow(aic_toolbox_masked[:, :, mid_slice], cmap='hot')
+plt.title('AIC Map (Toolbox, masked)')
 plt.axis('off')
-plt.colorbar()
-plt.subplot(1, 3, 2)
-plt.imshow(f_toolbox[:, :, mid_slice], cmap='jet', vmin=0, vmax=0.3)
-plt.title('Toolbox f map')
+plt.colorbar(fraction=0.046, pad=0.04)
+
+plt.subplot(1, 2, 2)
+plt.imshow(aic_my_masked[:, :, mid_slice], cmap='hot')
+plt.title('AIC Map (Voxelwise, masked)')
 plt.axis('off')
-plt.colorbar()
-plt.subplot(1, 3, 3)
-plt.imshow(f_my[:, :, mid_slice], cmap='jet', vmin=0, vmax=0.3)
-plt.title('Voxelwise f map')
-plt.axis('off')
-plt.colorbar()
+plt.colorbar(fraction=0.046, pad=0.04)
+
+plt.suptitle("AIC Maps Comparison (Masked, Central Slice)", fontsize=16)
 plt.tight_layout()
 plt.show()
