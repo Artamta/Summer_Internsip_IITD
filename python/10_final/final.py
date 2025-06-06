@@ -23,19 +23,8 @@ dmap_toolbox=nb.load(snr60_toolbox_out_D)
 d_star_map_toolbox=nb.load(snr60_toolbox_out_D_star)
 k_map_toolbox=nb.load(snr60_toolbox_out_K)
 
-np.arr=original_fmap
-#print(np.arr)
+#Def_AIC
 
-#just 
-
-x=[1,2,3,4]
-y=[1,23,54,653]
-
-plt.plot(x,y,label="linear")
-plt.xlabel=("lun")
-plt.ylabel=("chu")
-plt.title=("sex")
-plt.plot(x,y,label="linear")
-plt.show()
+#Voxel
 
 
