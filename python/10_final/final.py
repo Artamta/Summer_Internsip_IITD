@@ -4,15 +4,21 @@ from scipy.optimize import curve_fit
 import matplotlib.pyplot as plt
 import os
 
-# --- IVIM-DKI model in log-parameter space ---
+# IVIM-DKI model in log-parameter space ---
+#correction
+#Fix the Bonds - Search in web
+#use np and check element wise or array wise multiplication
+#use np.exp np.log use np function 
+#f * np.exp(-b * D_star) + (1 - f) * np.exp(-b * D_slow + (1/6) * (b ** 2) * (D_slow ** 2) * k)
 def ivim_dki_model_log(b, log_f, log_D_star, log_D_slow, log_k):
     f = np.exp(log_f)
     D_star = np.exp(log_D_star)
     D_slow = np.exp(log_D_slow)
     k = np.exp(log_k)
-    exp1 = np.exp(np.clip(-b * D_star, -100, 100))
-    exp2 = np.exp(np.clip(-b * D_slow + (1/6) * (b ** 2) * (D_slow ** 2) * k, -100, 100))
-    return f * exp1 + (1 - f) * exp2
+    exp1 = np.exp(-b * D_star)
+    exp2 = np.exp(-b * D_slow + (1/6) * (b ** 2) * (D_slow ** 2) * k)
+    var= f * exp1 + (1 - f) * exp2
+    return var
 
 #  Paths ---
 snr60 = "/Users/ayush/Desktop/project-internsip/new_work/OneDrive_2_23-05-2025/Simulation-III_Nifty-data/Simulation-III_SNR60/Data-1_Simulation-III_SNR-60.nii"
@@ -24,9 +30,15 @@ toolbox_k_path = "/Users/ayush/Desktop/project-internsip/Output_Parameter_Maps/D
 
 # Fitting settings (log scale)
 bvals = np.array([0, 25, 50, 75, 100, 150, 200, 500, 800, 1000, 1250, 1500, 2000])
-bounds = ([0.0001, 0.0001, 0.001, 0.01], [0.05, 0.5, 1, 3])#0.05 in ss
+#bounds = ([0.0001, 0.0001, 0.001, 0.01], [0.05, 0.5, 1, 3])#0.05 in ss
 p0 = [0.013, 0.013, 0.23, 1.1]
-log_bounds = (np.log(bounds[0]), np.log(bounds[1]))
+#log_bounds = (np.log(bounds[0]), np.log(bounds[1]))
+#make two bounds lower upper
+lower_bound=[0.0001, 0.0001, 0.001, 0.01]
+upper_bound=[0.05, 0.5, 1, 3]
+
+log_bounds=(np.log(lower_bound),np.log(upper_bound))
+
 log_p0 = np.log(p0)
 
 # Load data
@@ -48,7 +60,7 @@ for x in range(shape[0]):
                 continue
             try:
                 log_ppot, _ = curve_fit(
-                    ivim_dki_model_log, bvals, signal, p0=log_p0, bounds=log_bounds
+                    ivim_dki_model_log, bvals, signal, p0=log_p0,bounds=log_bounds
                 )
                 ppot = np.exp(log_ppot)
                 f_map_voxelwise[x, y, z] = ppot[0]
