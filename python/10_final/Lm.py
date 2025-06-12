@@ -1,26 +1,16 @@
 import numpy as np
 import nibabel as nb
-from scipy.optimize import curve_fit
 import matplotlib.pyplot as plt
 import os
+from lmfit import Model, Parameters
 
-# IVIM-DKI model in log-parameter space ---
-#correction
-#Fix the Bonds - Search in web
-#use np and check element wise or array wise multiplication
-#use np.exp np.log use np function 
-#f * np.exp(-b * D_star) + (1 - f) * np.exp(-b * D_slow + (1/6) * (b ** 2) * (D_slow ** 2) * k)
-def ivim_dki_model_log(b, log_f, log_D_star, log_D_slow, log_k):
-    f = np.exp(log_f)
-    D_star = np.exp(log_D_star)
-    D_slow = np.exp(log_D_slow)
-    k = np.exp(log_k)
-    # Use wide clipping for stability
-    exp1 = np.exp(np.clip(-b * D_star, -700, 700))
-    exp2 = np.exp(np.clip(-b * D_slow + (1/6) * (b ** 2) * (D_slow ** 2) * k, -700, 700))
+# IVIM-DKI model (not in log space for lmfit, use bounds instead)
+def ivim_dki_model(b, f, D_star, D_slow, k):
+    exp1 = np.exp(np.clip(-b * D_star, -100, 100))
+    exp2 = np.exp(np.clip(-b * D_slow + (1/6) * (b ** 2) * (D_slow ** 2) * k, -100, 100))
     return f * exp1 + (1 - f) * exp2
 
-#  Paths ---
+# Paths ---
 snr60 = "/Users/ayush/Desktop/project-internsip/new_work/OneDrive_2_23-05-2025/Simulation-III_Nifty-data/Simulation-III_SNR60/Data-1_Simulation-III_SNR-60.nii"
 ref_f_path = "/Users/ayush/Desktop/project-internsip/new_work/OneDrive_2_23-05-2025/Simulation-III_Nifty-data/Simulation-III_f_map.nii"
 toolbox_f_path = "/Users/ayush/Desktop/project-internsip/Output_Parameter_Maps/Data-1_Simulation-III_SNR-60_f.nii"
@@ -28,18 +18,11 @@ toolbox_d_path = "/Users/ayush/Desktop/project-internsip/Output_Parameter_Maps/D
 toolbox_dstar_path = "/Users/ayush/Desktop/project-internsip/Output_Parameter_Maps/Data-1_Simulation-III_SNR-60_D_star.nii"
 toolbox_k_path = "/Users/ayush/Desktop/project-internsip/Output_Parameter_Maps/Data-1_Simulation-III_SNR-60_k.nii"
 
-# Fitting settings (log scale)
+# Fitting settings
 bvals = np.array([0, 25, 50, 75, 100, 150, 200, 500, 800, 1000, 1250, 1500, 2000])
-#bounds = ([0.0001, 0.0001, 0.001, 0.01], [0.05, 0.5, 1, 3])#0.05 in ss
-p0 = [0.013, 0.013, 0.23, 1.1]
-#log_bounds = (np.log(bounds[0]), np.log(bounds[1]))
-#make two bounds lower upper
-lower_bound=[0.0001, 0.0001, 0.001, 0.01]
-upper_bound=[0.05, 0.5, 1, 3]
-
-log_bounds=(np.log(lower_bound),np.log(upper_bound))
-
-log_p0 = np.log(p0)
+p0 = [0.013, 0.023, 0.23, 1.1]
+lower_bound = [0.0001, 0.0001, 0.001, 0.01]
+upper_bound = [0.05, 0.5, 2, 3]
 
 # Load data
 snr60_data = nb.load(snr60)
@@ -49,56 +32,43 @@ f_map_voxelwise = np.full(shape, np.nan)
 Dstar_map_voxelwise = np.full(shape, np.nan)
 Dslow_map_voxelwise = np.full(shape, np.nan)
 k_map_voxelwise = np.full(shape, np.nan)
-'''
-# --- Voxelwise Fitting ---
+
+# --- Voxelwise Fitting with lmfit ---
 fitted_voxels = 0
+model = Model(ivim_dki_model, independent_vars=['b'])
+
 for x in range(shape[0]):
     for y in range(shape[1]):
         for z in range(shape[2]):
             signal = data[x, y, z, :]
-            # Only fit if b=0 is positive, finite, and above a noise threshold (e.g. 30)
-            if signal[0] < 0 or np.isnan(signal[0]) or np.isinf(signal[0]):
+            if np.all(signal == 0) or np.any(signal < 0) or np.any(np.isnan(signal)) or np.any(np.isinf(signal)):
                 continue
             # Normalize signal
             signal = signal / signal[0]
             # Skip if any value is nan/inf after normalization
             if np.any(np.isnan(signal)) or np.any(np.isinf(signal)):
                 continue
+            params = Parameters()
+            params.add('f', value=p0[0], min=lower_bound[0], max=upper_bound[0])
+            params.add('D_star', value=p0[1], min=lower_bound[1], max=upper_bound[1])
+            params.add('D_slow', value=p0[2], min=lower_bound[2], max=upper_bound[2])
+            params.add('k', value=p0[3], min=lower_bound[3], max=upper_bound[3])
             try:
-                log_ppot, _ = curve_fit(
-                    ivim_dki_model_log, bvals, signal, p0=log_p0, bounds=log_bounds
-                )
-                ppot = np.exp(log_ppot)
-                f_map_voxelwise[x, y, z] = ppot[0]
-                Dstar_map_voxelwise[x, y, z] = ppot[1]
-                Dslow_map_voxelwise[x, y, z] = ppot[2]
-                k_map_voxelwise[x, y, z] = ppot[3]
+                result = model.fit(signal, b=bvals, params=params, method='leastsq')
+                f_map_voxelwise[x, y, z] = result.params['f'].value
+                Dstar_map_voxelwise[x, y, z] = result.params['D_star'].value
+                Dslow_map_voxelwise[x, y, z] = result.params['D_slow'].value
+                k_map_voxelwise[x, y, z] = result.params['k'].value
                 fitted_voxels += 1
             except Exception:
                 continue
-'''
 
-fitted_voxels = 0
-signal = data[shape[0]//2, shape[1]//2, shape[2]//2, :]
-print("Test voxel signal:", signal)
-if signal[0] > 0 and not np.isnan(signal[0]) and not np.isinf(signal[0]):
-    signal = signal / signal[0]
-    print("Normalized:", signal)
-    print("log_p0:", log_p0)
-    print("log_bounds:", log_bounds)
-    try:
-        log_ppot, _ = curve_fit(
-            ivim_dki_model_log, bvals, signal, p0=log_p0, bounds=log_bounds
-        )
-        print("Fit succeeded:", np.exp(log_ppot))
-    except Exception as e:
-        print("Fit failed:", e)
 print("Total fitted voxels:", fitted_voxels)
 print("f_map_voxelwise: min", np.nanmin(f_map_voxelwise), "max", np.nanmax(f_map_voxelwise))
 
-# Save nii files
+# Save nii files (optional)
 '''
-output_dir = "/Users/ayush/Desktop/project-internsip/Results/final.nii"
+output_dir = "/Users/ayush/Desktop/project-internsip/Results/final_lmfit.nii"
 os.makedirs(output_dir, exist_ok=True)
 affine = snr60_data.affine
 nb.Nifti1Image(f_map_voxelwise, affine).to_filename(os.path.join(output_dir, "fitted_f_map.nii.gz"))
@@ -114,9 +84,9 @@ d_toolbox = nb.load(toolbox_d_path).get_fdata()
 dstar_toolbox = nb.load(toolbox_dstar_path).get_fdata()
 k_toolbox = nb.load(toolbox_k_path).get_fdata()
 
-# Error metrics function
+# Error metrics function (same as before)
 def error_metrics(ref, est, label):
-    mask = np.isfinite(ref) & np.isfinite(est)&  (ref != 0)#remove-zeroes
+    mask = np.isfinite(ref) & np.isfinite(est) & (ref != 0)
     ref_vals = ref[mask]
     est_vals = est[mask]
     rmse = np.sqrt(np.mean((est_vals - ref_vals) ** 2))

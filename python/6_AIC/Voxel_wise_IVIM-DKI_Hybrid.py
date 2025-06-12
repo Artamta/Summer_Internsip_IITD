@@ -1,69 +1,68 @@
 import numpy as np
-import nibabel as nib
+import nibabel as nb
 from scipy.optimize import curve_fit
-import os
 
-# --- IVIM-DKI model function ---
-def ivim_dki_model(b, f, D_star, D_slow, k):
-    exp1 = np.exp(-b * D_star)
-    exp2 = np.exp(-b * D_slow + (1/6) * (b ** 2) * (D_slow ** 2) * k)
-    return f * exp1 + (1 - f) * exp2
+def ivim_dki_model(b_values, f, D_star, D_slow, k):
+    # IVIM-DKI hybrid model: S/S0 = f*exp(-b*D*) + (1-f)*exp(-b*D + (1/6)*b^2*D^2*k)
+    return f * np.exp(-b_values * D_star) + (1 - f) * np.exp(-b_values * D_slow + (1/6) * (b_values ** 2) * (D_slow ** 2) * k)
 
-# --- Load data ---
-nii_path = "/Users/ayush/Desktop/project-internsip/new_work/OneDrive_2_23-05-2025/Simulation-III_Nifty-data/Simulation-III_SNR60/Data-1_Simulation-III_SNR-60.nii"
-img = nib.load(nii_path)
-data = img.get_fdata()
-bvals = np.array([0, 25, 50, 75, 100, 150, 200, 500, 800, 1000, 1250, 1500, 2000])
+nii_file_path = "/Users/ayush/Desktop/project-internsip/new_work/OneDrive_2_23-05-2025/Simulation-III_Nifty-data/Simulation-III_SNR15/Data-1_Simulation-III_SNR-15.nii"
+nifti_image = nb.load(nii_file_path)
+print(f"NIfTI image shape: {nifti_image.shape}")
+image_data = nifti_image.get_fdata()
+b_values_array = np.array([0, 25, 50, 75, 100, 150, 200, 500, 800, 1000, 1250, 1500, 2000])
 
-# --- Output arrays ---
-shape = data.shape[:3]
-f_map = np.full(shape, np.nan)
-Dstar_map = np.full(shape, np.nan)
-Dslow_map = np.full(shape, np.nan)
-k_map = np.full(shape, np.nan)
-aic_map = np.full(shape, np.nan)
+image_shape_3d = image_data.shape[:3]
+f_map = np.full(image_shape_3d, np.nan)
+D_star_map = np.full(image_shape_3d, np.nan)
+D_slow_map = np.full(image_shape_3d, np.nan)
+k_map = np.full(image_shape_3d, np.nan)
+aic_map = np.full(image_shape_3d, np.nan)
 
-# --- Fitting settings ---
-bounds = ([0.0001, 0.0001, 0.001, 0.01], [0.05, 0.5, 1, 3])
-p0 = [0.013, 0.013, 0.23, 1.1]
+# Bounds and initial guesses for [f, D*, D, k]
+parameter_bounds = ([0.0001, 0.0001, 0.001, 0.01], [0.05, 0.5, 1, 3])
+initial_guesses = [0.0008,0.00913,0.12,0.9]
 
-# --- Voxelwise fitting ---
-for x in range(shape[0]):
-    for y in range(shape[1]):
-        for z in range(shape[2]):
-            signal = data[x, y, z, :]
-            if np.any(signal > 0) and signal[0] != 0:
-                y_norm = signal / signal[0]
-                if np.any(np.isnan(y_norm)) or np.any(np.isinf(y_norm)):
-                    continue
+num_voxels_x, num_voxels_y, num_voxels_z = image_shape_3d
+
+for x_idx in range(num_voxels_x):
+    for y_idx in range(num_voxels_y):
+        for z_idx in range(num_voxels_z):
+            voxel_signal_decay = image_data[x_idx, y_idx, z_idx, :]
+            if np.any(voxel_signal_decay > 0) and voxel_signal_decay[0] != 0:
+                y = voxel_signal_decay / voxel_signal_decay[0]
                 try:
-                    popt, _ = curve_fit(
-                        ivim_dki_model, bvals, y_norm, p0=p0, bounds=bounds, maxfev=10000
+                    fitted_params, _ = curve_fit(
+                        ivim_dki_model,
+                        b_values_array,
+                        y,
+                        p0=initial_guesses,
+                        bounds=parameter_bounds,
+                        maxfev=10000
                     )
-                    y_fit = ivim_dki_model(bvals, *popt)
-                    rss = np.sum((y_norm - y_fit) ** 2)
-                    n = len(bvals)
-                    k_param = 4
-                    aic = 2 * k_param + n * np.log(rss / n) if rss > 0 else np.nan
-                    f_map[x, y, z], Dstar_map[x, y, z], Dslow_map[x, y, z], k_map[x, y, z] = popt
-                    aic_map[x, y, z] = aic
-                except:
+                    y_hat = ivim_dki_model(b_values_array, *fitted_params)
+                    residuals = y - y_hat
+                    rss = np.sum(residuals ** 2)
+                    n = len(y)
+                    k_param = len(fitted_params)
+                    aic = 2 * k_param + n * np.log(rss / n) if rss > 0 and n > 0 else np.nan
+                    f_map[x_idx, y_idx, z_idx] = fitted_params[0]
+                    D_star_map[x_idx, y_idx, z_idx] = fitted_params[1]
+                    D_slow_map[x_idx, y_idx, z_idx] = fitted_params[2]
+                    k_map[x_idx, y_idx, z_idx] = fitted_params[3]
+                    aic_map[x_idx, y_idx, z_idx] = aic
+                except Exception:
                     continue
 
-# --- Save results ---
-out_dir = "/Users/ayush/Desktop/project-internsip/Results/6_Aic_CALC"
-os.makedirs(out_dir, exist_ok=True)
-affine = img.affine
-nib.Nifti1Image(np.nan_to_num(f_map), affine).to_filename(os.path.join(out_dir, "f.nii.gz"))
-nib.Nifti1Image(np.nan_to_num(Dstar_map), affine).to_filename(os.path.join(out_dir, "Dstar.nii.gz"))
-nib.Nifti1Image(np.nan_to_num(Dslow_map), affine).to_filename(os.path.join(out_dir, "D.nii.gz"))
-nib.Nifti1Image(np.nan_to_num(k_map), affine).to_filename(os.path.join(out_dir, "k.nii.gz"))
-nib.Nifti1Image(np.nan_to_num(aic_map), affine).to_filename(os.path.join(out_dir, "AIC.nii.gz"))
+print("Voxel-wise IVIM-DKI fitting complete.")
+num_fitted_voxels = np.sum(~np.isnan(f_map))
+print(f"Number of voxels fitted: {num_fitted_voxels} / {f_map.size}")
 
-# --- Print summary statistics ---
-print("Fitting complete.")
-print("f_map: min {:.4f}, max {:.4f}, mean {:.4f}".format(np.nanmin(f_map), np.nanmax(f_map), np.nanmean(f_map)))
-print("Dstar_map: min {:.4f}, max {:.4f}, mean {:.4f}".format(np.nanmin(Dstar_map), np.nanmax(Dstar_map), np.nanmean(Dstar_map)))
-print("Dslow_map: min {:.4f}, max {:.4f}, mean {:.4f}".format(np.nanmin(Dslow_map), np.nanmax(Dslow_map), np.nanmean(Dslow_map)))
-print("k_map: min {:.4f}, max {:.4f}, mean {:.4f}".format(np.nanmin(k_map), np.nanmax(k_map), np.nanmean(k_map)))
-print("AIC_map: min {:.2f}, max {:.2f}, mean {:.2f}".format(np.nanmin(aic_map), np.nanmax(aic_map), np.nanmean(aic_map)))
+if num_fitted_voxels > 0:
+    print(f"f_map min/max: {np.nanmin(f_map):.4f} / {np.nanmax(f_map):.4f}")
+    print(f"D_star_map min/max: {np.nanmin(D_star_map):.4f} / {np.nanmax(D_star_map):.4f}")
+    print(f"D_slow_map min/max: {np.nanmin(D_slow_map):.6f} / {np.nanmax(D_slow_map):.6f}")
+    print(f"k_map min/max: {np.nanmin(k_map):.4f} / {np.nanmax(k_map):.4f}")
+    print(f"AIC_map min/max: {np.nanmin(aic_map):.2f} / {np.nanmax(aic_map):.2f}")
+else:
+    print("No voxels were successfully fitted. Check data, b-values, bounds, or initial guesses.")

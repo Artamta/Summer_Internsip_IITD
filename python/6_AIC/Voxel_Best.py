@@ -2,12 +2,11 @@ import os
 import numpy as np
 import nibabel as nb
 from scipy.optimize import curve_fit
-from scipy.special import expit, logit
 import matplotlib.pyplot as plt
 
-# 1. Define the IVIM-DKI model in log/logit scale
-def ivim_dki_model_log(b_values, logit_f, log_D_star, log_D_slow, log_k):
-    f = expit(logit_f)
+# 1. Define the IVIM-DKI model in log scale (all parameters)
+def ivim_dki_model_log(b_values, log_f, log_D_star, log_D_slow, log_k):
+    f = np.exp(log_f)
     D_star = np.exp(log_D_star)
     D_slow = np.exp(log_D_slow)
     k = np.exp(log_k)
@@ -37,14 +36,14 @@ D_slow_map = np.full(image_shape_3d, np.nan)
 k_map = np.full(image_shape_3d, np.nan)
 aic_map = np.full(image_shape_3d, np.nan)
 
-# 4. Set bounds and initial guesses in log/logit space
-p0 = [logit(0.13), np.log(0.013), np.log(0.23), np.log(1.1)]
-bounds = ([logit(0.01), np.log(0.0001), np.log(0.001), np.log(0.01)],
-          [logit(0.3), np.log(0.5), np.log(1), np.log(3)])
+# 4. Set bounds and initial guesses in log scale
+p0 = [np.log(0.13), np.log(0.013), np.log(0.23), np.log(1.1)]
+bounds = ([np.log(0.01), np.log(0.0001), np.log(0.001), np.log(0.01)],
+          [np.log(0.3), np.log(0.5), np.log(1), np.log(3)])
 
 num_voxels_x, num_voxels_y, num_voxels_z = image_shape_3d
 
-# 5. Main voxel-wise fitting loop (log/logit scale)
+# 5. Main voxel-wise fitting loop (log scale)
 fit_fail_count = 0
 for x_idx in range(num_voxels_x):
     for y_idx in range(num_voxels_y):
@@ -62,7 +61,6 @@ for x_idx in range(num_voxels_x):
                         y,
                         p0=p0,
                         bounds=bounds,
-                        maxfev=10000
                     )
                     y_hat = ivim_dki_model_log(b_values_array, *fitted_params)
                     residuals = y - y_hat
@@ -70,8 +68,8 @@ for x_idx in range(num_voxels_x):
                     n = len(y)
                     k_param = len(fitted_params)
                     aic = 2 * k_param + n * np.log(rss / n) if rss > 0 and n > 0 else np.nan
-                    # Store fitted parameters (convert back from log/logit)
-                    f_map[x_idx, y_idx, z_idx] = expit(fitted_params[0])
+                    # Store fitted parameters (convert back from log)
+                    f_map[x_idx, y_idx, z_idx] = np.exp(fitted_params[0])
                     D_star_map[x_idx, y_idx, z_idx] = np.exp(fitted_params[1])
                     D_slow_map[x_idx, y_idx, z_idx] = np.exp(fitted_params[2])
                     k_map[x_idx, y_idx, z_idx] = np.exp(fitted_params[3])
@@ -80,7 +78,7 @@ for x_idx in range(num_voxels_x):
                     fit_fail_count += 1
                     continue
 
-print("Voxel-wise IVIM-DKI log/logit fitting complete.")
+print("Voxel-wise IVIM-DKI log fitting complete.")
 num_fitted_voxels = np.sum(~np.isnan(f_map))
 print(f"Number of voxels fitted: {num_fitted_voxels} / {f_map.size}")
 print(f"Total fit failures: {fit_fail_count}")
