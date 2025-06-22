@@ -24,16 +24,6 @@ est_img_dstar_tv = nib.load("/Users/ayush/Desktop/project-internsip/Output_Param
 est_img_f_tv = nib.load("/Users/ayush/Desktop/project-internsip/Output_Parameter_Maps/Data-1_Simulation-I_SNR-60_f.nii")
 est_img_k_tv = nib.load("/Users/ayush/Desktop/project-internsip/Output_Parameter_Maps/Data-1_Simulation-I_SNR-60_k.nii")
 
-# --- HY model lines commented out ---
-# est_img_d = nib.load("...")
-# est_img_dstar = nib.load("...")
-# est_img_f = nib.load("...")
-# est_img_k = nib.load("...")
-
-# est_d = est_img_d.get_fdata()
-# est_dstar = est_img_dstar.get_fdata()
-# est_f = est_img_f.get_fdata()
-# est_k = est_img_k.get_fdata()
 
 est_d_tv = est_img_d_tv.get_fdata()
 est_dstar_tv = est_img_dstar_tv.get_fdata()
@@ -57,17 +47,11 @@ ref_prm_vals = ref_prm.flatten()
 # est_prm_vals = est_prm.flatten()
 est_prm_tv_vals = est_prm_tv.flatten()
 
-# RMSE 
-# rmse = np.sqrt(np.mean((est_prm_vals - ref_prm_vals) ** 2))
-# rmse_norm_hy = (rmse / np.mean(ref_prm_vals)) * 100
 
 rmse_tv = np.sqrt(np.mean((est_prm_tv_vals - ref_prm_vals) ** 2))
 rmse_norm_tv = (rmse_tv / np.mean(ref_prm_vals)) * 100
 
-# Relative Bias 
-# aa = (np.subtract(est_prm_vals,  ref_prm_vals))
-# bb = np.divide(aa, ref_prm_vals)
-# rel_bias_hy = np.mean(bb)*100
+
 
 aa = (np.subtract(est_prm_tv_vals,  ref_prm_vals))
 bb = np.divide(aa, ref_prm_vals)
@@ -90,9 +74,6 @@ n = np.size(b_val)  # Number of data points
 for i in range(est_d_tv.shape[0]):
     for j in range(est_d_tv.shape[1]):
         for k in range(est_d_tv.shape[2]):
-            # residuals_hy = np.subtract(y_data[i,j,k,:], y_predicted_hy[i,j,k,:])
-            # RSS_hy = np.sum(residuals_hy**2)
-            # aic_map_hy[i,j,k] = 2 * parameters + n*np.log(RSS_hy / n)
             residuals_tv = np.subtract(y_data[i, j, k, :], y_predicted_tv[i, j, k, :])
             RSS_tv = np.sum(residuals_tv ** 2)
             aic_map_tv[i, j, k] = 2 * parameters + n * np.log(RSS_tv / n)
@@ -104,11 +85,6 @@ aic_tv = np.nanmean(aic_map_tv.flatten())
 # aicc_hy = aic_hy + (2*parameters*(parameters+1)/(n-parameters-1))
 aicc_tv = aic_tv + (2*parameters*(parameters+1)/(n-parameters-1))
 
-# print("RMSE normalized: HYmodel = %, IDTV model = %", rmse_norm_hy, rmse_norm_tv)
-# print("Relative Bias: HYmodel = %, IDTV model = %",rel_bias_hy, rel_bias_tv)
-# print("Relative Parameter: HYmodel = %, IDTV model = %",rel_param_hy, rel_param_tv)
-# print("AIC: HYmodel = %, IDTV model = %", aic_hy, aicc_tv)
-# print("AIC Corrected: HYmodel = %, IDTV model = %", aicc_hy, aicc_tv)
 
 print("RMSE normalized: IDTV model = %", rmse_norm_tv)
 print("Relative Bias: IDTV model = %", rel_bias_tv)
