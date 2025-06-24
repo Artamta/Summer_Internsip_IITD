@@ -1,110 +1,154 @@
 import numpy as np
 import nibabel as nib
+import os
 import matplotlib.pyplot as plt
+import pandas as pd
 
-def sim_ivim_dki(b_val, est_d, est_dp, est_f, est_k):
-    y_predicted = np.zeros(y_data.shape)
-    for k in range(np.size(b_val)):
-        y_predicted[:,:,:,k] = (est_f * np.exp(-b_val[k] * est_dp)) + (1 - est_f) * np.exp(
-            (-b_val[k] * est_d) + (1 / 6) * est_k * np.square(-b_val[k]) * np.square(est_d))
-    return y_predicted
+def sim_ivim_dki(bvals, D, D_star, f, k, shape):
+    """Simulate IVIM-DKI signal for all voxels and b-values."""
+    y_pred = np.zeros(shape)
+    for idx, b in enumerate(bvals):
+        y_pred[..., idx] = (f * np.exp(-b * D_star)) + (1 - f) * np.exp(
+            (-b * D) + (1 / 6) * k * (b ** 2) * (D ** 2)
+        )
+    return y_pred
 
-# Loading Images
-b_val = [0, 25, 50, 75, 100, 150, 200, 500, 800, 1000, 1250, 1500, 2000]
+# --- Setup ---
+bvals = [0, 25, 50, 75, 100, 150, 200, 500, 800, 1000, 1250, 1500, 2000]
+snrs = [15, 25, 40, 60]
+datas = [1, 2, 3, 4, 5]
+simulations = {
+    1: {"param": "D",      "sim_str": "I",   "ref_map": "Simulation-I_D_map.nii"},
+    2: {"param": "D_star", "sim_str": "II",  "ref_map": "Simulation-II_Dstar_map.nii"},
+    3: {"param": "f",      "sim_str": "III", "ref_map": "Simulation-III_f_map.nii"},
+    4: {"param": "k",      "sim_str": "IV",  "ref_map": "Simulation-IV_k_map.nii"},
+}
+base_ref = "/Users/ayush/Desktop/project-internsip/reference_maps"
+base_data = "/Users/ayush/Desktop/project-internsip/Simulation data"
+base_est = "/Users/ayush/Desktop/project-internsip/new_output"
 
-# Load original parametric map for accuracy calculation
-ref_img = nib.load("/Users/ayush/Desktop/project-internsip/new_data/Simulation-I_D_map.nii")
+results = []
 
-# Load simulated IVIM-DKI data
-ref_data = nib.load("/Users/ayush/Desktop/project-internsip/new_data/Data-1_Simulation-I_SNR-60.nii")
+# --- Main Loop ---
+for sim_num, sim_info in simulations.items():
+    # Load reference parameter map for this simulation
+    ref_path = os.path.join(base_ref, sim_info["ref_map"])
+    ref_map = nib.load(ref_path).get_fdata()
+    ref_flat = ref_map.flatten()
 
-# Load estimated Parametric map for advanced model IDTV
-est_img_d_tv = nib.load("/Users/ayush/Desktop/project-internsip/Output_Parameter_Maps/Data-1_Simulation-I_SNR-60_D.nii")
-est_img_dstar_tv = nib.load("/Users/ayush/Desktop/project-internsip/Output_Parameter_Maps/Data-1_Simulation-I_SNR-60_D_star.nii")
-est_img_f_tv = nib.load("/Users/ayush/Desktop/project-internsip/Output_Parameter_Maps/Data-1_Simulation-I_SNR-60_f.nii")
-est_img_k_tv = nib.load("/Users/ayush/Desktop/project-internsip/Output_Parameter_Maps/Data-1_Simulation-I_SNR-60_k.nii")
+    for snr in snrs:
+        for data_idx in datas:
+            # Build file paths for all estimated parameter maps and signal data
+            est_dir = os.path.join(base_est, f"simulation{sim_num}", f"snr{snr}", "Output_Parameter_Maps")
+            est_paths = {
+                "D":      os.path.join(est_dir, f"Data-{data_idx}_Simulation-{sim_info['sim_str']}_SNR-{snr}_D.nii"),
+                "D_star": os.path.join(est_dir, f"Data-{data_idx}_Simulation-{sim_info['sim_str']}_SNR-{snr}_D_star.nii"),
+                "f":      os.path.join(est_dir, f"Data-{data_idx}_Simulation-{sim_info['sim_str']}_SNR-{snr}_f.nii"),
+                "k":      os.path.join(est_dir, f"Data-{data_idx}_Simulation-{sim_info['sim_str']}_SNR-{snr}_k.nii"),
+            }
+            y_path = os.path.join(
+                base_data,
+                f"Simulation-{sim_info['sim_str']}_Nifty-data",
+                f"Simulation-{sim_info['sim_str']}_SNR{snr}",
+                f"Data-{data_idx}_Simulation-{sim_info['sim_str']}_SNR-{snr}.nii"
+            )
 
+            # Skip if any file is missing
+            if not all(os.path.exists(p) for p in est_paths.values()) or not os.path.exists(y_path):
+                print(f"Missing file for Sim {sim_num}, SNR {snr}, Data {data_idx}")
+                continue
 
-est_d_tv = est_img_d_tv.get_fdata()
-est_dstar_tv = est_img_dstar_tv.get_fdata()
-est_f_tv = est_img_f_tv.get_fdata()
-est_k_tv = est_img_k_tv.get_fdata()
+            # Load all estimated parameter maps and signal data
+            est_maps = {k: nib.load(v).get_fdata() for k, v in est_paths.items()}
+            y_data = nib.load(y_path).get_fdata()
 
-# est_prm = est_d  # change this for different simulations
-est_prm_tv = est_d_tv # change this for different simulations
-ref_prm = ref_img.get_fdata()
-y_data = ref_data.get_fdata()
+            # Select the estimated map for the parameter of interest
+            est_param_map = est_maps[sim_info["param"]]
+            est_flat = est_param_map.flatten()
 
-# Shape of Phantom
-print("Reference shape:", ref_prm.shape)
-# print("Estimated shape:", est_prm.shape)
-print("Estimated shape:", est_prm_tv.shape)
-print("Y-data shape:", y_data.shape)
+            # --- Metrics ---
+            rmse = np.sqrt(np.mean((est_flat - ref_flat) ** 2))
+            rmse_norm = (rmse / np.mean(ref_flat)) * 100
+            rel_bias = np.mean((est_flat - ref_flat) / ref_flat) * 100
+            rel_param = np.mean(est_flat / ref_flat)
 
-# Error Calculation
+            # --- AIC/AICc ---
+            y_pred = sim_ivim_dki(bvals, est_maps["D"], est_maps["D_star"], est_maps["f"], est_maps["k"], y_data.shape)
+            parameters = 4
+            n = len(bvals)
+            aic_map = np.zeros(est_param_map.shape)
+            for i in range(est_param_map.shape[0]):
+                for j in range(est_param_map.shape[1]):
+                    for k in range(est_param_map.shape[2]):
+                        residuals = y_data[i, j, k, :] - y_pred[i, j, k, :]
+                        RSS = np.sum(residuals ** 2)
+                        aic_map[i, j, k] = 2 * parameters + n * np.log(RSS / n + 1e-8)
+            aic = np.nanmean(aic_map)
+            aicc = aic + (2 * parameters * (parameters + 1) / (n - parameters - 1))
 
-ref_prm_vals = ref_prm.flatten()
-# est_prm_vals = est_prm.flatten()
-est_prm_tv_vals = est_prm_tv.flatten()
+            # --- Print results ---
+            print(f"Sim {sim_num} ({sim_info['param']}), SNR {snr}, Data {data_idx}: "
+                  f"RMSE={rmse_norm:.4f}, Bias={rel_bias:.4f}, RelParam={rel_param:.4f}, "
+                  f"AIC={aic:.4f}, AICc={aicc:.4f}")
 
+            # --- Save results for CSV ---
+            results.append({
+                "Simulation": sim_num,
+                "Parameter": sim_info["param"],
+                "SNR": snr,
+                "Data": data_idx,
+                "RMSE_norm": rmse_norm,
+                "Rel_Bias": rel_bias,
+                "Rel_Param": rel_param,
+                "AIC": aic,
+                "AICc": aicc
+            })
 
-rmse_tv = np.sqrt(np.mean((est_prm_tv_vals - ref_prm_vals) ** 2))
-rmse_norm_tv = (rmse_tv / np.mean(ref_prm_vals)) * 100
+# --- Save all results to CSV ---
+df = pd.DataFrame(results)
+csv_path = "/Users/ayush/Desktop/project-internsip/new_output/accuracy_metrics_all_simulations.csv"
+df.to_csv(csv_path, index=False)
+print(f"Saved all results to {csv_path}")
 
+# --- Plot all 4 reference and estimated maps for a chosen SNR and Data ---
+snr_plot = 60
+data_plot = 1
 
+ref_maps = []
+est_maps = []
+titles = []
 
-aa = (np.subtract(est_prm_tv_vals,  ref_prm_vals))
-bb = np.divide(aa, ref_prm_vals)
-rel_bias_tv = np.mean(bb)*100
+for sim_num, sim_info in simulations.items():
+    # Reference map
+    ref_path = os.path.join(base_ref, sim_info["ref_map"])
+    ref_map = nib.load(ref_path).get_fdata()
+    ref_maps.append(ref_map)
+    titles.append(f"Ref {sim_info['param']}")
 
-# Relative Parameter
-# rel_param_hy = np.mean(est_prm_vals / ref_prm_vals)
-rel_param_tv = np.mean(est_prm_tv_vals / ref_prm_vals)
+    # Estimated map
+    est_dir = os.path.join(base_est, f"simulation{sim_num}", f"snr{snr_plot}", "Output_Parameter_Maps")
+    est_path = os.path.join(est_dir, f"Data-{data_plot}_Simulation-{sim_info['sim_str']}_SNR-{snr_plot}_{sim_info['param']}.nii")
+    if os.path.exists(est_path):
+        est_map = nib.load(est_path).get_fdata()
+    else:
+        est_map = np.zeros_like(ref_map)
+    est_maps.append(est_map)
+    titles.append(f"Est {sim_info['param']}")
 
-# AIC = 2n + nln(RSS/n)
-# y_predicted_hy = sim_ivim_dki(b_val, est_d, est_dstar, est_f, est_k)
-y_predicted_tv = sim_ivim_dki(b_val, est_d_tv, est_dstar_tv, est_f_tv, est_k_tv)
-
-# aic_map_hy = np.zeros(est_d.shape)
-aic_map_tv = np.zeros(est_d_tv.shape)
-
-parameters = 4  # Number of parameters
-n = np.size(b_val)  # Number of data points
-
-for i in range(est_d_tv.shape[0]):
-    for j in range(est_d_tv.shape[1]):
-        for k in range(est_d_tv.shape[2]):
-            residuals_tv = np.subtract(y_data[i, j, k, :], y_predicted_tv[i, j, k, :])
-            RSS_tv = np.sum(residuals_tv ** 2)
-            aic_map_tv[i, j, k] = 2 * parameters + n * np.log(RSS_tv / n)
-
-# aic_hy = np.nanmean(aic_map_hy.flatten())
-aic_tv = np.nanmean(aic_map_tv.flatten())
-
-#AICc = AIC + (2k(k+1))/(n-k-1)
-# aicc_hy = aic_hy + (2*parameters*(parameters+1)/(n-parameters-1))
-aicc_tv = aic_tv + (2*parameters*(parameters+1)/(n-parameters-1))
-
-
-print("RMSE normalized: IDTV model = %", rmse_norm_tv)
-print("Relative Bias: IDTV model = %", rel_bias_tv)
-print("Relative Parameter: IDTV model = %", rel_param_tv)
-print("AIC: IDTV model = %", aic_tv)
-print("AIC Corrected: IDTV model = %", aicc_tv)
-
-# Visualization:  (original, estimated)
-mid_slice = ref_prm.shape[2] // 2
-plt.figure(figsize=(10, 4))
-plt.subplot(1, 2, 1)
-plt.imshow(ref_prm[:, :, mid_slice], cmap='jet', vmin=0, vmax=0.003)
-plt.title('Reference parameter map')
-plt.axis('off')
-plt.colorbar()
-
-plt.subplot(1, 2, 2)
-plt.imshow(est_prm_tv[:, :, mid_slice], cmap='jet', vmin=0, vmax=0.003)
-plt.title('Estimated parameters map (TV)')
-plt.axis('off')
-plt.colorbar()
+mid = ref_maps[0].shape[2] // 2
+plt.figure(figsize=(16, 8))
+for i in range(4):
+    plt.subplot(2, 4, i+1)
+    plt.imshow(ref_maps[i][:, :, mid], cmap='jet')
+    plt.title(titles[2*i])
+    plt.axis('off')
+    plt.colorbar(fraction=0.046, pad=0.04)
+    plt.subplot(2, 4, i+5)
+    plt.imshow(est_maps[i][:, :, mid], cmap='jet')
+    plt.title(titles[2*i+1])
+    plt.axis('off')
+    plt.colorbar(fraction=0.046, pad=0.04)
 plt.tight_layout()
+plt.savefig("/Users/ayush/Desktop/project-internsip/new_output/all_maps_overview.png", dpi=300)
 plt.show()
+print("Saved overview plot of all reference and estimated maps.")
