@@ -53,6 +53,7 @@ for sim_num, sim_info in simulations.items():
             est_path = os.path.join(sim_dir, file_pattern.format(data_num, snr))
             if os.path.exists(est_path):
                 est_map = nib.load(est_path).get_fdata()
+                print(f"Checking: {est_path}, Exists: {os.path.exists(est_path)}") 
             else:
                 est_map = np.zeros_like(ref_prm)
             # Reference

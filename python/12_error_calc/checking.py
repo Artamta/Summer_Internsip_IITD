@@ -13,16 +13,16 @@ def sim_ivim_dki(b_val, est_d, est_dp, est_f, est_k):
 b_val = [0, 25, 50, 75, 100, 150, 200, 500, 800, 1000, 1250, 1500, 2000]
 
 # Load original parametric map for accuracy calculation
-ref_img = nib.load("/Users/ayush/Desktop/project-internsip/reference_maps/Simulation-I_D_map.nii")
+ref_img = nib.load("/Users/ayush/Desktop/project-internsip/reference_maps/Simulation-III_f_map.nii")
 
 # Load simulated IVIM-DKI data
-ref_data = nib.load("/Users/ayush/Desktop/project-internsip/Simulation data/Simulation-I_Nifty-data/Simulation-I_SNR60/Data-5_Simulation-I_SNR-60.nii")
+ref_data = nib.load("/Users/ayush/Desktop/project-internsip/Simulation data/Simulation-III_Nifty-data/Simulation-III_SNR15/Data-1_Simulation-III_SNR-15.nii")
 
 # Load estimated Parametric map for advanced model IDTV
-est_img_d_tv = nib.load("/Users/ayush/Desktop/project-internsip/output/simulation1/Data-5_Simulation-I_SNR-60_D.nii")
-est_img_dstar_tv = nib.load("/Users/ayush/Desktop/project-internsip/output/simulation1/Data-5_Simulation-I_SNR-60_D_star.nii")
-est_img_f_tv = nib.load("/Users/ayush/Desktop/project-internsip/output/simulation1/Data-5_Simulation-I_SNR-60_f.nii")
-est_img_k_tv = nib.load("/Users/ayush/Desktop/project-internsip/output/simulation1/Data-5_Simulation-I_SNR-60_k.nii")
+est_img_d_tv = nib.load("/Users/ayush/Desktop/project-internsip/output/simulation3/Output_Parameter_Maps/Data-1_Simulation-III_SNR-15_D.nii")
+est_img_dstar_tv = nib.load("/Users/ayush/Desktop/project-internsip/output/simulation3/Output_Parameter_Maps/Data-1_Simulation-III_SNR-15_D_star.nii")
+est_img_f_tv = nib.load("/Users/ayush/Desktop/project-internsip/output/simulation3/Output_Parameter_Maps/Data-1_Simulation-III_SNR-15_f.nii")
+est_img_k_tv = nib.load("/Users/ayush/Desktop/project-internsip/output/simulation3/Output_Parameter_Maps/Data-1_Simulation-III_SNR-15_k.nii")
 
 # --- HY model lines commented out ---
 # est_img_d = nib.load("...")
@@ -41,7 +41,7 @@ est_f_tv = est_img_f_tv.get_fdata()
 est_k_tv = est_img_k_tv.get_fdata()
 
 # est_prm = est_d  # change this for different simulations
-est_prm_tv = est_d_tv # change this for different simulations
+est_prm_tv = est_f_tv # change this for different simulations
 ref_prm = ref_img.get_fdata()
 y_data = ref_data.get_fdata()
 
@@ -116,19 +116,19 @@ print("Relative Parameter: IDTV model = %", rel_param_tv)
 print("AIC: IDTV model = %", aic_tv)
 print("AIC Corrected: IDTV model = %", aicc_tv)
 
-# Visualization:  (original, estimated)
-mid_slice = ref_prm.shape[2] // 2
-plt.figure(figsize=(10, 4))
-plt.subplot(1, 2, 1)
-plt.imshow(ref_prm[:, :, mid_slice], cmap='jet', vmin=0, vmax=0.003)
-plt.title('Reference parameter map')
-plt.axis('off')
-plt.colorbar()
+# # Visualization:  (original, estimated)
+# mid_slice = ref_prm.shape[2] // 2
+# plt.figure(figsize=(10, 4))
+# plt.subplot(1, 2, 1)
+# plt.imshow(ref_prm[:, :, mid_slice], cmap='jet', vmin=0, vmax=0.003)
+# plt.title('Reference parameter map')
+# plt.axis('off')
+# plt.colorbar()
 
-plt.subplot(1, 2, 2)
-plt.imshow(est_prm_tv[:, :, mid_slice], cmap='jet', vmin=0, vmax=0.003)
-plt.title('Estimated parameters map (TV)')
-plt.axis('off')
-plt.colorbar()
-plt.tight_layout()
-plt.show()
+# plt.subplot(1, 2, 2)
+# plt.imshow(est_prm_tv[:, :, mid_slice], cmap='jet', vmin=0, vmax=0.003)
+# plt.title('Estimated parameters map (TV)')
+# plt.axis('off')
+# plt.colorbar()
+# plt.tight_layout()
+# plt.show()

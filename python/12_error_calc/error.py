@@ -109,7 +109,7 @@ for sim_num, sim_info in simulations.items():
                     for k in range(est_map.shape[2]):
                         residuals = y_data[i, j, k, :] - y_predicted[i, j, k, :]
                         RSS = np.sum(residuals ** 2)
-                        aic_map[i, j, k] = 2 * parameters + n * np.log(RSS / n + 1e-8)
+                        aic_map[i, j, k] = 2 * parameters + n * np.log(RSS / n )
             aic = np.nanmean(aic_map.flatten())
             aicc = aic + (2*parameters*(parameters+1)/(n-parameters-1))
 
@@ -127,7 +127,7 @@ for sim_num, sim_info in simulations.items():
 
 # Save all results to CSV
 df = pd.DataFrame(results)
-csv_path = "/Users/ayush/Desktop/project-internsip/reference_maps/accuracy_metrics_all_simulations.csv"
+csv_path = "/Users/ayush/Desktop/project-internsip/reference_maps/accuracy_metrics_all_simulations_updated.csv"
 df = df.sort_values(['Simulation', 'Data', 'SNR'])
-df.to_csv(csv_path, index=False)
+df.to_csv(csv_path, index=False,float_format="%.17g")
 print(f"Saved all results for all simulations to {csv_path}")

@@ -1,7 +1,7 @@
 import pandas as pd
 
 # Load your results
-df = pd.read_csv("/Users/ayush/Desktop/project-internsip/reference_maps/accuracy_metrics_all_simulations.csv")
+df = pd.read_csv("/Users/ayush/Desktop/project-internsip/new_output/accuracy_metrics_all_simulations.csv")
 
 # Define parameters and their simulation numbers
 param_sim_map = {
@@ -14,7 +14,7 @@ snr_order = [60, 40, 25, 15]
 data_order = [1, 2, 3, 4, 5]
 
 # Create a writer for Excel
-with pd.ExcelWriter("/Users/ayush/Desktop/project-internsip/reference_maps/simulation_results_supervisor_format.xlsx") as writer:
+with pd.ExcelWriter("/Users/ayush/Desktop/project-internsip/new_output/accuracy.xlsx") as writer:
     for param, sim_num in param_sim_map.items():
         rows = []
         for snr in snr_order:
