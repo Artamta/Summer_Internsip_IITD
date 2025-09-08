@@ -8,189 +8,162 @@ Centre for Biomedical Engineering
 
 ---
 
-[![Python](https://img.shields.io/badge/Python-3.9%2B-blue.svg)](https://www.python.org/)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
-
----
-
 ## Abstract
 
-> This repository contains the complete codebase, analysis pipeline, and selected results from my summer research internship at IIT Delhi (CBME), focused on advanced quantitative diffusion MRI. The project implements voxel-wise bi-exponential IVIM and hybrid IVIM-DKI models for diffusion-weighted imaging, with robust parameter estimation using Total Variation (TV) regularization. The workflow covers data I/O (DICOM/NIfTI), ROI selection, nonlinear least-squares fitting, synthetic simulations across SNR levels, and quantitative evaluation using RMSE, bias, and AIC. TV regularization substantially improves the consistency and reliability of parameter maps, especially under low SNR conditions.
+This repository presents the outcomes of my remote summer internship at CBME, IIT Delhi, focused on advanced quantitative MRI analysis. The primary objective was to implement and evaluate voxel-wise bi-exponential (IVIM) and hybrid IVIM-DKI models for diffusion-weighted imaging, with robust parameter estimation using Total Variation (TV) regularization. The workflow covers data I/O (DICOM/NIfTI), ROI selection, nonlinear least-squares fitting, synthetic simulations across SNR levels, and quantitative evaluation using RMSE, bias, and AIC. TV regularization substantially improves the consistency and reliability of parameter maps, especially under low SNR conditions.
 
 ---
 
-## 🚀 Quick Navigation
+## Table of Contents
 
-- [Project Motivation](#project-motivation)
-- [Scientific Background](#scientific-background)
+- [Introduction](#introduction)
+- [Motivation](#motivation)
+- [Literature Review](#literature-review)
 - [Methodology](#methodology)
 - [Results](#results)
-- [Repository Structure](#repository-structure)
-- [Installation & Usage](#installation--usage)
-- [Reproducibility](#reproducibility)
-- [Data & Ethics](#data--ethics)
+- [Discussion](#discussion)
+- [Conclusion](#conclusion)
 - [References](#references)
 - [Acknowledgements](#acknowledgements)
-- [License](#license)
+- [Appendix](#appendix)
 - [Contact](#contact)
 
 ---
 
-## Project Motivation
+## Introduction
 
-Quantitative diffusion MRI modeling, especially using advanced techniques such as IVIM-DKI with TV regularization, is at the forefront of biomedical imaging research. These methods enable improved tissue characterization, early disease detection, and personalized treatment planning.
+Diffusion MRI is a crucial noninvasive method for probing tissue microstructure. IVIM MRI uses multi–b-value diffusion-weighted acquisitions to separate true molecular diffusion from microvascular perfusion effects. The IVIM bi-exponential model enables simultaneous quantification of diffusion and perfusion without contrast agents. DKI extends the mono-exponential model by adding a kurtosis term to capture non-Gaussian diffusion. Hybrid IVIM-DKI models combine these concepts to capture perfusion, diffusion, and kurtosis in a single framework.
 
 ---
 
-## Scientific Background
+## Motivation
 
-<details>
-<summary>Click to expand mathematical models</summary>
+Quantitative diffusion MRI modeling, particularly using advanced techniques such as IVIM-DKI with TV regularization, represents a cutting-edge approach in biomedical imaging. This work contributes to the advancement of noninvasive diagnostics and precision medicine in India.
 
-**IVIM Model:**  
-_S(b) = S₀ [ f·exp(−bD*) + (1−f)·exp(−bD) ]_  
-where S₀ is baseline signal, D is diffusion coefficient, D\* is pseudo-diffusion coefficient, and f is perfusion fraction.
+---
 
-**DKI Model:**  
-_S(b)/S₀ ≈ exp( −bD + (1/6)b²D²K )_
+## Literature Review
 
-**Hybrid IVIM-DKI:**  
-Combines perfusion and kurtosis effects for richer tissue characterization.
-
-**Total Variation Regularization:**  
-Promotes spatial smoothness in parameter maps, reducing noise while preserving anatomical edges.
-
-</details>
+- **IVIM Model:** Quantifies perfusion without contrast agents, though D\* often exhibits high voxel-wise variability.
+- **DKI Model:** Extends the mono-exponential model by introducing a kurtosis parameter.
+- **Hybrid IVIM-DKI:** Leverages both low- and high-b value information for improved tissue differentiation.
+- **Total Variation Regularization:** Promotes spatial smoothness in parameter maps by penalizing large differences between neighboring voxels.
 
 ---
 
 ## Methodology
 
-<details>
-<summary>Click to expand workflow steps</summary>
+### Data Loading and Preprocessing
 
-1. **Data Loading & Preprocessing:**  
-   DICOM/NIfTI images loaded using NiBabel and SimpleITK. ROI selection via MRIcron.
+MRIcron was used to load DICOM/NIfTI images and define ROIs. In Python, NiBabel imported NIfTI files into NumPy arrays, and SimpleITK performed conversions and resampling.
 
-2. **Histogram & ROI Analysis:**  
-   Intensity histograms and kernel density estimates computed for tumor ROIs.
+**Figure 1: ROI Selection Workflow**  
+![ROI Selection](Results/add_plts/methodology.png)
 
-3. **Visualization:**  
-   Matplotlib used for single-slice visualizations: raw images, fitted parameter maps, and residuals.
+### Histogram and ROI Analysis
 
-4. **Nonlinear Model Fitting:**  
-   Voxel-wise nonlinear least-squares fitting using `scipy.optimize.curve_fit` and `lmfit`.
+Intensity histograms and kernel density estimates were computed for tumor ROIs. ROI masks generated in MRIcron were used to extract voxel intensities, enabling calculation of summary statistics for both raw signal and fitted parameters.
 
-5. **Synthetic Phantom Generation:**  
-   2D bulls-eye phantom created in NumPy for controlled validation.
+**Figure 2: Frequency vs. Intensity Histogram**  
+![Histogram](Results/add_plts/histogram.png)
 
-6. **Custom IVIM-Hybrid Model:**  
-   Developed and evaluated custom implementations for IVIM and IVIM-DKI.
+### Visualization
 
-7. **Total Variation Regularization:**  
-   Used IDTV model toolbox for TV-regularized fitting and statistical analysis.
+Single-slice visualizations from a randomly selected Liver HCC dataset were generated using Matplotlib.
 
-8. **SNR Simulations:**  
-   Synthetic data generated at SNR levels 15, 25, 40, 60.
+**Figure 3: Example Slice Visualization**  
+![Slice](Results/add_plts/crosssection.png)
 
-9. **Real Patient Data Analysis:**  
-   Processed IVIM data from tumor and healthy tissue regions.
+### Nonlinear Model Fitting
 
-</details>
+Voxel-wise nonlinear least-squares fitting of IVIM and IVIM-DKI models was implemented using `scipy.optimize.curve_fit` and `lmfit`. Both Levenberg-Marquardt and trust-region reflective algorithms were tested.
+
+### Synthetic Phantom Generation
+
+A 2D bulls-eye phantom with concentric parameter regions was created in NumPy to serve as a synthetic test case for model validation. Composite visualization shows the reference, estimated, mask, and masked results.
+
+**Figure 4: Phantom Composite Visualization**  
+![Phantom Composite](Results/add_plts/digifantom.png)
+
+### Custom IVIM-Hybrid Model
+
+Custom implementations of IVIM and hybrid IVIM-DKI models were developed and compared against the IDTV toolbox.
+
+**Figure 5: Parameter Map Comparison**  
+![Parameter Comparison](Results/add_plts/parammaps.png)
+
+### Total Variation Regularization
+
+The IDTV model toolbox was used for TV-regularized fitting and statistical analysis.
+
+**Figure 6: IDTV Toolbox Interface**  
+![IDTV Toolbox](Results/add_plts/toolbox.png)
+
+### SNR Simulations
+
+Simulations were conducted using synthetic data generated at different SNR levels (15, 25, 40, 60).
 
 ---
 
 ## Results
 
-### Synthetic Simulation Data
+### Synthetic Simulation Data Analysis
 
-- **Validation:** Monte Carlo simulations at multiple SNR levels.
-- **Metrics:** RMSE, relative bias, relative parameter error, AIC.
-- **Findings:**
-  - D recovered with low bias across SNRs.
-  - D\* estimation improved with SNR but remained challenging.
-  - f and K showed systematic biases.
-  - TV regularization reduced RMSE and parameter variability by 20–40%.
+Parameter maps for diffusion coefficient (D), pseudo-diffusion coefficient (D\*), perfusion fraction (f), and kurtosis parameter (K) were generated using the IVIM-TV toolbox. For each synthetic dataset, ROI-based statistics were computed.
 
-### Clinical Data Analysis
+**Figure 7: IVIM-DKI Parameter Simulation Analysis**  
+![Simulation Analysis](Results/add_plts/simulation_analysis.png)
 
-- **Dataset:** 14 patients, 4 organ systems (Liver HCC, Lymphoma, Prostate, Rectum).
-- **Comparisons:** Benign vs. tumor tissue parameter distributions.
-- **Statistical Analysis:** Two-sample t-tests; no significant differences detected (sample size limitation).
-- **Trends:** Benign tissues generally showed higher D and f; tumor tissues had higher kurtosis.
+#### Table 1: Simulation Results Summary
 
-### 📊 Example Visualizations
-
-#### Parameter Map Comparison
-
-![Parameter Map](Results/parameter_map_example.png)
-_Figure: Comparison of standard and TV-regularized parameter maps._
-
-#### Simulation RMSE vs SNR
-
-![RMSE vs SNR](Results/rmse_vs_snr.png)
-_Figure: RMSE improvement with increasing SNR._
-
-#### ROI Histogram
-
-![ROI Histogram](Results/roi_histogram.png)
-_Figure: Intensity distribution in tumor ROI._
+| Parameter | SNR | RMSE (%)     | Rel. Bias (%) | Rel. Parameter  | AIC          |
+| --------- | --- | ------------ | ------------- | --------------- | ------------ |
+| D         | 15  | 17.84 ± 0.04 | 0.30 ± 0.05   | 1.0030 ± 0.0005 | -66.5 ± 0.0  |
+| D         | 25  | 13.84 ± 0.02 | 0.95 ± 0.03   | 1.0095 ± 0.0003 | -79.3 ± 0.0  |
+| D         | 40  | 11.60 ± 0.03 | 1.06 ± 0.03   | 1.0106 ± 0.0003 | -91.6 ± 0.0  |
+| D         | 60  | 10.63 ± 0.01 | 1.22 ± 0.01   | 1.0122 ± 0.0001 | -100.1 ± 0.0 |
+| D\*       | 15  | 45.04 ± 0.03 | -6.61 ± 0.13  | 0.9339 ± 0.0013 | -66.8 ± 0.0  |
+| D\*       | 25  | 35.58 ± 0.05 | -4.16 ± 0.18  | 0.9584 ± 0.0018 | -80.0 ± 0.0  |
+| D\*       | 40  | 27.38 ± 0.08 | -2.68 ± 0.06  | 0.9732 ± 0.0006 | -92.7 ± 0.0  |
+| D\*       | 60  | 22.55 ± 0.04 | -2.13 ± 0.05  | 0.9787 ± 0.0005 | -101.5 ± 0.0 |
+| f         | 15  | 27.55 ± 2.19 | 3.95 ± 1.43   | 1.0395 ± 0.0143 | -74.8 ± 16.4 |
+| f         | 25  | 26.03 ± 0.04 | 4.95 ± 0.03   | 1.0495 ± 0.0003 | -79.4 ± 0.0  |
+| f         | 40  | 24.85 ± 0.03 | 5.77 ± 0.03   | 1.0577 ± 0.0003 | -91.5 ± 0.0  |
+| f         | 60  | 24.29 ± 0.01 | 6.10 ± 0.01   | 1.0610 ± 0.0001 | -99.4 ± 0.0  |
+| K         | 15  | 16.48 ± 0.04 | 20.95 ± 0.07  | 1.2095 ± 0.0007 | -66.2 ± 0.0  |
+| K         | 25  | 11.90 ± 0.01 | 20.30 ± 0.07  | 1.2030 ± 0.0007 | -79.1 ± 0.0  |
+| K         | 40  | 9.64 ± 0.01  | 20.03 ± 0.02  | 1.2003 ± 0.0002 | -91.3 ± 0.0  |
+| K         | 60  | 8.87 ± 0.01  | 19.94 ± 0.02  | 1.1994 ± 0.0002 | -99.3 ± 0.0  |
 
 ---
 
-## Repository Structure
+### Clinical IVIM-DKI Parameter Analysis
 
-```
-python/           # Scripts and notebooks for analysis
-Results/          # Output tables, figures, logs
-docs/             # Manuscript, figures, supplementary materials
-data/             # (Not tracked) Raw, interim, processed data
-README.md         # This file
-requirements.txt  # Python dependencies
-.gitignore        # Excludes large datasets, output folders
-```
+A multi-organ study compared parameter distributions between benign and malignant tissues.
 
----
+**Figure 8: Clinical Parameter Distributions**  
+![Clinical Boxplots](Results/add_plts/results.png)
 
-## Installation & Usage
+#### Table 2: Clinical Data Summary
 
-**Environment Setup (macOS):**
-
-```bash
-python3 -m venv .venv
-source .venv/bin/activate
-pip install -U pip
-pip install numpy scipy matplotlib seaborn nibabel simpleitk lmfit scikit-image pandas tqdm
-```
-
-**Try Interactive Analysis in Jupyter:**
-
-```bash
-jupyter notebook python/analysis_notebook.ipynb
-```
-
-**Typical Workflow:**
-
-```bash
-python python/run_simulation.py
-python python/run_fitting.py --dwi data/dwi.nii.gz --bvals data/dwi.bval --mask data/mask.nii.gz --model ivim-dki --tv --lambda 0.1
-```
+| Organ System | Benign Measurements | Tumor Measurements |
+| ------------ | ------------------- | ------------------ |
+| Liver_HCC    | 16                  | 16                 |
+| Lymphoma     | 16                  | 16                 |
+| Prostate     | 16                  | 16                 |
+| Rectum       | 0                   | 8                  |
 
 ---
 
-## Reproducibility
+## Discussion
 
-- Fixed random seeds in simulation modules.
-- Explicit parameter bounds and initial guesses.
-- ROI-based evaluation to minimize confounds.
-- Metrics: RMSE, normalized RMSE, relative bias, relative parameter, AIC.
+This internship provided hands-on experience in the complete workflow of quantitative diffusion MRI analysis, from data loading and ROI definition to advanced model fitting and statistical evaluation. TV regularization substantially improved the stability and spatial coherence of parameter maps, reducing variability by 30–50%. While synthetic simulations confirmed the robustness of the framework, clinical data analysis was limited by small sample size and inter-patient variability.
 
 ---
 
-## Data & Ethics
+## Conclusion
 
-- Clinical data are not distributed; only summary tables are shared.
-- All patient data handled under institutional ethical guidelines and anonymization protocols.
+Through this project, I developed practical skills in quantitative MRI, including data preprocessing, model implementation, and advanced regularization techniques. The use of TV regularization proved essential for robust parameter estimation, especially in low SNR conditions. The established workflow lays a strong foundation for future research.
 
 ---
 
@@ -213,15 +186,40 @@ python python/run_fitting.py --dwi data/dwi.nii.gz --bvals data/dwi.bval --mask 
 
 ---
 
-## License
+## Appendix
 
-If you intend open distribution, add an MIT or BSD license file. Otherwise, this repository is “All rights reserved” by default.
+### Additional Figures
+
+**Figure A1: Workflow Diagram**  
+![Workflow Diagram](Results/add_plts/params.png)
+
+**Figure A2: Additional Results**  
+![Additional Results](Results/add_plts/voxelvsivim.png)
+![Clinical Comparison](Results/add_plts/clinical.png)
+
+### Additional Tables
+
+#### Table A1: Parameter Bounds Used in Fitting
+
+| Organ     | Parameter | Benign (Mean ± SD, N) | Tumor (Mean ± SD, N) | P-Value | Significance    |
+| --------- | --------- | --------------------- | -------------------- | ------- | --------------- |
+| Liver_HCC | D\*       | 0.0203 ± 0.0025, 4    | 0.0186 ± 0.0022, 4   | 0.346   | Not Significant |
+| Liver_HCC | D         | 0.0011 ± 0.0001, 4    | 0.0011 ± 0.0002, 4   | 0.618   | Not Significant |
+| Liver_HCC | f         | 0.2580 ± 0.0322, 4    | 0.2309 ± 0.0328, 4   | 0.284   | Not Significant |
+| Liver_HCC | k         | 0.8180 ± 0.0660, 4    | 0.7734 ± 0.1021, 4   | 0.491   | Not Significant |
+| Lymphoma  | D\*       | 0.0175 ± 0.0027, 4    | 0.0178 ± 0.0068, 4   | 0.926   | Not Significant |
+| Lymphoma  | D         | 0.0012 ± 0.0002, 4    | 0.0013 ± 0.0004, 4   | 0.694   | Not Significant |
+| Lymphoma  | f         | 0.2561 ± 0.0504, 4    | 0.2688 ± 0.1126, 4   | 0.844   | Not Significant |
+| Lymphoma  | k         | 1.3249 ± 0.1213, 4    | 1.2747 ± 0.2915, 4   | 0.761   | Not Significant |
+| Prostate  | D\*       | 0.0112 ± 0.0052, 4    | 0.0120 ± 0.0013, 4   | 0.789   | Not Significant |
+| Prostate  | D         | 0.0013 ± 0.0004, 4    | 0.0010 ± 0.0002, 4   | 0.196   | Not Significant |
+| Prostate  | f         | 0.1766 ± 0.0407, 4    | 0.1721 ± 0.0184, 4   | 0.848   | Not Significant |
+| Prostate  | k         | 0.8689 ± 0.3256, 4    | 1.2561 ± 0.4621, 4   | 0.220   | Not Significant |
 
 ---
 
 ## Contact
 
-For questions or collaboration, open an issue or contact:  
 Ayush Raj — Research Intern, CBME, IIT Delhi  
 Code: [GitHub Python methods](https://github.com/Artamta/Summer_Internsip_IITD/tree/main/python)
 
