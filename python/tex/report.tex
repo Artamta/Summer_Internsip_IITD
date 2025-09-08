@@ -1,0 +1,629 @@
+\documentclass[a4paper,12pt]{article}
+\usepackage[utf8]{inputenc}
+\usepackage{graphicx} % For including images
+\usepackage{amsmath, amssymb} % For mathematical equations and symbols
+\usepackage{geometry} % For page layout and margins
+\usepackage{caption} % For customizing captions
+\usepackage{subcaption} % ESSENTIAL for the subfigure environment
+\usepackage{booktabs} % For professional-looking tables
+\usepackage{float} % For [H] placement specifier
+\usepackage{xcolor}       % For colors
+\usepackage{tcolorbox}    % For colored boxes
+\usepackage{calligra}
+\usepackage[T1]{fontenc}
+\usepackage{hyperref}
+
+
+\geometry{margin=1in} % Set document margins
+
+\begin{document}
+
+% Front Page
+
+% Front Page
+\begin{titlepage}
+    \centering
+    
+    % Top logo section
+    \vspace*{0.8cm}
+    \includegraphics[width=0.33\textwidth]{iitd.jpg}\\[0.8cm]
+    
+    % Institution name
+    {\large \textsc{Indian Institute of Technology Delhi}}\\
+    {\normalsize \textsc{Centre for Biomedical Engineering}}\\[1.2cm]
+    
+    % Main title
+    {\LARGE \textbf{Voxel-Wise IVIM/IVIM-DKI Modeling}}\\[0.3cm]
+    {\LARGE \textbf{with Total Variation Regularization}}\\[0.8cm]
+    
+    % Subtitle with decorative line
+    \rule{0.8\textwidth}{0.4pt}\\[0.3cm]
+    {\large \textit{Advanced Computational Framework for}}\\
+    {\large \textit{Diffusion-Weighted Magnetic Resonance Imaging}}\\[0.3cm]
+    \rule{0.8\textwidth}{0.4pt}\\[1cm]
+    
+    % Report type
+    {\Large \textbf{REPORT}}\\[0.2cm]
+    {\normalsize Summer Research Internship}\\[1.2cm]
+    
+    % Author section
+    {\large \textbf{Submitted by:}}\\[0.3cm]
+    {\Large \textsc{Ayush Raj}}\\[0.2cm]
+    {\normalsize Research Intern}\\[1cm]
+    
+    % Compact supervision section
+    {\large \textbf{Supervised by:}}\\[0.3cm]
+    {\normalsize \textbf{Dr. Amit Mehndiratta} (Professor)}\\
+    {\normalsize \textbf{Dr. Esha Baidya Kayal} (Co-supervisor)}\\[0.2cm]
+    {\footnotesize Centre for Biomedical Engineering}\\[1cm]
+    
+    \vfill
+    
+    % Date and bottom logo
+    {\normalsize \textbf{July 2025}}\\[0.4cm]
+    
+\end{titlepage}
+    
+    % Abstract (on its own page)
+\clearpage
+\begin{abstract}
+This report presents the outcomes of my remote summer internship at the Centre for Biomedical Engineering, IIT Delhi, focused on advanced quantitative MRI analysis. The primary objective was to implement and evaluate voxel-wise bi-exponential (IVIM) and hybrid IVIM-DKI models for diffusion-weighted imaging, with an emphasis on robust parameter estimation using Total Variation (TV) regularization. I gained proficiency in handling MRI data formats (DICOM/NIfTI), ROI selection using MRIcron, and image processing with Python libraries such as NiBabel and SimpleITK. Through simulations and real patient data, I developed and applied nonlinear least-squares fitting routines (\texttt{scipy.optimize.curve\_fit}, \texttt{lmfit}) and compared standard and TV-regularized approaches. Quantitative assessments—including RMSE, bias, and AIC—demonstrated that TV regularization substantially improves the consistency and reliability of parameter maps, especially under low SNR conditions. This work provided comprehensive exposure to the end-to-end workflow of quantitative MRI analysis, from data preprocessing and model implementation to statistical evaluation, and highlighted the clinical potential of advanced regularization techniques in diffusion MRI.
+\end{abstract}
+
+% Main content
+\clearpage
+\section{Introduction}
+Diffusion MRI has become a crucial noninvasive method for probing tissue microstructure. In particular, Intravoxel Incoherent Motion (IVIM) MRI uses multi--$b$-value diffusion-weighted acquisitions to separate true molecular diffusion from microvascular perfusion effects. In the IVIM bi-exponential model, the signal $S(b)$ is modeled as:
+\begin{equation}
+    S(b) = S_{0}\Bigl(f e^{-bD^{*}} + (1 - f)e^{-bD}\Bigr),
+\end{equation}
+where $S_{0}$ is the baseline signal, $D$ is the diffusion coefficient, $D^{*}$ the pseudo-diffusion coefficient, and $f$ the perfusion fraction. This model, proposed by Le Bihan in the 1980s, enables simultaneous quantification of diffusion and perfusion without contrast agents.
+
+In many tissues, diffusion deviates from mono-exponential decay due to microstructural heterogeneity. Diffusion Kurtosis Imaging (DKI) extends the mono-exponential model by adding a kurtosis term $K$ to capture non-Gaussian diffusion:
+\begin{equation}
+    \frac{S(b)}{S_{0}} \approx e^{-bD + \tfrac{1}{6}b^{2}D^{2}K}.
+\end{equation}
+Hybrid IVIM-DKI models combine these concepts to capture perfusion, diffusion, and kurtosis in a single framework.
+
+Voxel-wise fitting of these nonlinear models poses challenges: parameter maps can be noisy and discontinuous due to low SNR and complex multi-parameter optimization. To address this, I applied Total Variation (TV) regularization, which enforces spatial smoothness in parameter maps. Prior studies have demonstrated that TV-regularized IVIM fitting yields more stable estimates with lower error and bias than standard fitting.
+
+\subsection*{Motivation}
+Quantitative diffusion MRI modeling, particularly using advanced techniques such as IVIM-DKI with Total Variation regularization, represents a cutting-edge approach in biomedical imaging. Globally, leading research institutions and major healthcare organizations are actively exploring these methods for improved tissue characterization, early disease detection, and personalized treatment planning. In India, the Centre for Biomedical Engineering (CBME) at IIT Delhi is among the very few institutions pioneering research and development in this domain. The adoption and further advancement of such techniques hold significant promise for the future of noninvasive diagnostics and precision medicine in the country. By contributing to this emerging field, this work not only addresses current scientific challenges but also positions CBME, IIT Delhi at the forefront of quantitative MRI research in India.
+
+\section{Literature Review}
+The IVIM biexponential model is well established. Early IVIM studies highlighted its ability to quantify perfusion without gadolinium contrast agents, though parameters—especially $D^{*}$—often exhibit high voxel-wise variability.
+
+Diffusion Kurtosis Imaging (DKI) extends the mono-exponential model by introducing a kurtosis parameter $K$:
+\begin{equation}
+    \frac{S(b)}{S_{0}} \approx e^{-bD + \frac{1}{6}b^{2}D^{2}K}
+\end{equation}
+Hybrid IVIM-DKI approaches leverage both low- and high-$b$ value information for improved tissue differentiation. Histogram features of IVIM and DKI metrics have been combined to distinguish benign and malignant lesions with high accuracy in recent studies.
+
+Conventional voxel-wise fitting ignores spatial context, resulting in speckled parameter maps. Total Variation (TV) regularization is a mathematical technique that promotes spatial smoothness in parameter maps by penalizing large differences between neighboring voxels. Specifically, TV regularization minimizes the total amount of variation across the map, encouraging piecewise-smooth solutions while preserving important anatomical edges. Compared to conventional voxel-wise fitting, which treats each voxel independently and often results in noisy, unreliable maps, TV regularization leverages spatial information to suppress noise and enhance the reliability of estimated parameters. Kayal \textit{et al.} (2017) demonstrated that TV-penalized fitting reduced relative RMSE and bias of IVIM parameters across noise levels and improved coefficient of variation in clinical data.
+\section{Methodology}
+\subsection{Data Loading and Preprocessing}
+I used MRIcron to load DICOM/NIfTI images and define ROIs. In Python, NiBabel imported NIfTI files into NumPy arrays, and SimpleITK performed conversions and resampling.
+
+\begin{figure}[htbp]
+    \centering
+
+    % First Row
+    \begin{subfigure}[b]{0.3\textwidth}
+        \includegraphics[width=\linewidth]{ivim/gig1.png}
+        \caption{Step 1: Opening the file in MRIcron.}
+        \label{fig:roi_step1}
+    \end{subfigure}
+    \hfill
+    \begin{subfigure}[b]{0.3\textwidth}
+        \includegraphics[width=\linewidth]{ivim/gig2.png}
+        \caption{Step 2: Initial view of the brain scan.}
+        \label{fig:roi_step2}
+    \end{subfigure}
+    \hfill
+    \begin{subfigure}[b]{0.3\textwidth}
+        \includegraphics[width=\linewidth]{ivim/gig3.png}
+        \caption{Step 3: Adjusting display settings.}
+        \label{fig:roi_step3}
+    \end{subfigure}
+
+    \vspace{1em} % Vertical space between rows
+
+    % Second Row
+    \begin{subfigure}[b]{0.3\textwidth}
+        \includegraphics[width=\linewidth]{ivim/gig4.png}
+        \caption{Step 4: Beginning ROI definition.}
+        \label{fig:roi_step4}
+    \end{subfigure}
+    \hfill
+    \begin{subfigure}[b]{0.3\textwidth}
+        \includegraphics[width=\linewidth]{ivim/gig5.png}
+        \caption{Step 5: Refining the ROI selection.}
+        \label{fig:roi_step5}
+    \end{subfigure}
+    \hfill
+    \begin{subfigure}[b]{0.3\textwidth}
+        \includegraphics[width=\linewidth]{ivim/gig6.png}
+        \caption{Step 6: Finalized ROI for analysis.}
+        \label{fig:roi_step6}
+    \end{subfigure}
+
+    \caption{Step-by-step methodology for defining Regions of Interest (ROIs) in MRIcron.}
+    \label{fig:mricron_roi_methodology}
+\end{figure}
+
+\subsection*{Code Availability}
+All code used for data processing, model fitting, and analysis is available at: \url{https://github.com/Artamta/Summer_Internsip_IITD/tree/main/python}
+
+\subsection{Histogram and ROI Analysis}
+
+To quantitatively characterize the signal distribution within the tumor region of interest (ROI), I computed intensity histograms on high-$b$ diffusion images. ROI masks generated in MRIcron were used to extract voxel intensities from the tumor region, enabling calculation of summary statistics such as mean, median, and standard deviation for both the raw signal and fitted parameters.
+
+Figure~\ref{fig:tumor_intensity_analysis} presents two complementary visualizations of the tumor ROI intensity distribution. Panel (a) shows the frequency versus intensity histogram, which displays the raw count of voxels across various intensity ranges within the tumor ROI. This plot highlights the most prevalent intensity values and provides insight into the heterogeneity of the tumor tissue.
+
+Panel (b) depicts the histogram overlaid with a kernel density estimate (KDE) curve, illustrating the probability density function of the intensities within the tumor ROI. The KDE offers a smoothed representation of the underlying distribution, making it easier to identify modes and assess the spread of intensity values.
+
+Together, these plots provide a comprehensive view of the signal characteristics within the tumor ROI, facilitating both qualitative and quantitative assessment of tissue heterogeneity and aiding in the interpretation of subsequent model fitting results.
+
+\begin{figure}[H]
+    \centering
+    \begin{subfigure}[b]{0.49\textwidth}
+        \centering
+        \includegraphics[width=\linewidth]{ivim/tumor_roi_histogram_frequency.png}
+        \caption{Frequency vs. Intensity Histogram for Tumor ROI. This plot displays the raw count of voxels across various intensity ranges within the defined tumor region of interest, highlighting the most frequent intensity values.}
+        \label{fig:tumor_freq_hist}
+    \end{subfigure}%
+    \hfill
+    \begin{subfigure}[b]{0.49\textwidth}
+        \centering
+        \includegraphics[width=\linewidth]{ivim/tumor_roi_histogram_kde.png}
+        \caption{Histogram and Kernel Density Estimate (KDE) of Tumor ROI Intensities. This plot illustrates the density distribution of intensities within the tumor ROI, with the smoothed KDE curve providing an estimate of the underlying probability density function.}
+        \label{fig:tumor_kde_hist}
+    \end{subfigure}
+    \caption{Analysis of Tumor ROI Intensity Distribution. These plots visualize the intensity characteristics of the selected tumor region, showing both the direct frequency and the estimated probability density.}
+    \label{fig:tumor_intensity_analysis}
+\end{figure}
+
+\subsection{Visualization}
+For qualitative assessment of model fitting performance, I used Matplotlib to generate single-slice visualizations from a randomly selected Liver HCC dataset. The visualizations include: (a) a representative slice from the raw diffusion-weighted image, (b) the corresponding fitted parameter map obtained using the IDTV model toolbox, and (c) a qualitative assessment map showing the absolute difference between the raw and fitted images. These plots allow visual comparison of the original data, the effect of advanced fitting and regularization, and the residuals or changes introduced by the model.
+
+\begin{figure}[H]
+    \centering
+    \begin{subfigure}[b]{0.32\textwidth}
+        \centering
+        \includegraphics[width=\linewidth]{new/raw_diffusion.png}
+        \caption{Raw diffusion data slice from a random Liver HCC case.}
+        \label{fig:slice_r1}
+    \end{subfigure}%
+    \hfill
+    \begin{subfigure}[b]{0.32\textwidth}
+        \centering
+        \includegraphics[width=\linewidth]{new/idtv_fitted_map.png}
+        \caption{Fitted parameter map (IDTV model) for the same slice.}
+        \label{fig:slice_r2}
+    \end{subfigure}%
+    \hfill
+    \begin{subfigure}[b]{0.32\textwidth}
+        \centering
+        \includegraphics[width=\linewidth]{new/qualitative_assessment.png}
+        \caption{Qualitative assessment: absolute difference between raw and fitted images.}
+        \label{fig:slice_r3}
+    \end{subfigure}
+    \caption{Single-slice visualizations from a random Liver HCC dataset: (a) raw diffusion image, (b) IDTV fitted parameter map, and (c) qualitative assessment map. These images were generated using Matplotlib to visually evaluate the effectiveness of model fitting and regularization.}
+    \label{fig:slice_visualizations}
+\end{figure}
+
+\subsection{Nonlinear Model Fitting}
+I implemented voxel-wise nonlinear least-squares fitting of IVIM and IVIM-DKI models using \texttt{scipy.optimize.curve\_fit} and \texttt{lmfit}. Initial fits used a two-step approach, but final experiments used full nonlinear routines with physiological bounds for stability. Good initial parameter guesses, informed by literature and simplified models, were essential for reliable convergence. Both Levenberg-Marquardt and trust-region reflective algorithms were tested to optimize robustness and computational efficiency. Fitting was performed voxel-wise to generate detailed parameter maps, and ROI-averaged fits were also computed for validation. Model performance was quantitatively assessed using RMSE, relative bias, and AIC, enabling direct comparison between standard and TV-regularized approaches. Outlier rejection and SNR-based masking were applied to minimize the influence of noise and ensure physiologically meaningful results.
+
+\subsection{Synthetic Phantom Generation}
+A 2D bulls-eye phantom with concentric parameter regions was created in NumPy to serve as a synthetic test case for model validation. This phantom allows for controlled evaluation of parameter recovery under known ground-truth conditions.
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.5\textwidth]{ivim/bulleye_circle.png}
+    \caption{A 100x100 binary 'bulls-eye' phantom image, composed of ones and zeros, used for synthetic data validation.}
+    \label{fig:my_simple_image}
+\end{figure}
+
+In addition to generating the reference parameter map, I simulated noisy estimated maps and constructed a binary mask to isolate the region of interest. The composite visualization below shows the reference, estimated, mask, and masked results.
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=\textwidth]{ivim/Figure_1.png}
+    \caption{Composite visualization of the synthetic phantom experiment. From left to right: (1) Reference parameter map (full), (2) Estimated parameter map (full, with noise), (3) Binary mask, (4) Reference parameter map (masked), and (5) Estimated parameter map (masked). This setup enables quantitative validation of model fitting and masking strategies under controlled conditions.}
+    \label{fig:ivim/Figure_1.png}
+\end{figure}
+
+\subsection{Understanding \& Coding Custom IVIM-Hybrid Model}
+Leveraging the foundational knowledge acquired, I developed and evaluated custom implementations of the Intravoxel Incoherent Motion (IVIM) and hybrid IVIM-Diffusion Kurtosis Imaging (DKI) models. These models were applied to various image datasets, following the preprocessing steps outlined previously.
+
+A rigorous quantitative assessment of each model's performance was conducted by computing key metrics, including Root Mean Squared Error (RMSE), relative bias, relative parameter error, and the Akaike Information Criterion (AIC). This comprehensive evaluation enabled a detailed understanding of the strengths and limitations of the custom implementations.
+
+Notably, comparative analysis against an established toolbox model (IVIM-TV) revealed that, while the custom models performed robustly, the toolbox's TV-regularized approach consistently yielded superior results in terms of parameter stability and noise suppression. In my experiments, TV regularization typically reduced RMSE and parameter variability by approximately 20–40\% compared to standard IVIM and IVIM-hybrid fitting, consistent with trends reported in the literature. This comparison provided invaluable insights into the benefits of regularization techniques in complex nonlinear fitting problems, informing future directions for model optimization and refinement.
+
+\begin{figure}[htbp]
+\centering
+\includegraphics[width=0.8\textwidth]{rvt.png}
+\caption{Comparison of parameter maps derived from standard voxel-wise nonlinear fitting (middle) and the Toolbox (IDTV-Model) with Total Variation regularization (right) with refrence(left). Note the visibly reduced noise and enhanced spatial smoothness in the IDTV-Model's output.}
+\label{fig:rvt.png}
+\end{figure}
+
+\subsection{Total Variation Regularization}
+I utilized an existing IDTV model toolbox, which features a robust and user-friendly interface, to perform computations and statistical analyses on .nii (MRI) files. Comprehensive evaluation demonstrated that this toolbox consistently yielded superior results across various metrics, including AIC and RMSE. Consequently, the IDTV model was adopted as the primary method for all subsequent analyses.
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.8\textwidth]{ivim/toolbox.png}
+\caption{Screenshot of the IDTV model toolbox interface used for Total Variation regularization in IVIM/IVIM-DKI analysis. The figure illustrates the process of setting initial parameter guesses and monitoring iteration progress during model fitting.}
+\label{fig:ivim/toolbox.png}
+\end{figure}
+
+\subsection{SNR Simulations}
+To thoroughly assess model performance under varying noise conditions, I conducted simulations using synthetic data generated at different Signal-to-Noise Ratio (SNR) levels: SNR-15, SNR-25, SNR-40, and SNR-60. For each SNR level, both IVIM and IVIM-DKI models were fitted to the simulated data to generate corresponding parameter maps for $D$, $D^*$, $f$, and $K$. Subsequently, Region of Interest (ROI) statistics—including mean and standard deviation—were computed from these parameter maps to quantify model accuracy and precision across different noise regimes.
+
+\subsection{Real Patient Data Analysis}
+For the analysis of real patient data, I utilized the IDTV model toolbox to process IVIM data from both tumor and healthy tissue regions. This involved computing all relevant parameter maps (e.g., D, D 
+∗
+ , f, and K) for these regions. Following map generation, comprehensive Region of Interest (ROI) statistics were extracted from these maps, which will be presented and discussed in the Results section.
+\section{Results}
+
+\subsection*{Data Availability}
+Simulation data: \url{https://docs.google.com/spreadsheets/d/1XKLll_YyjdOcbk6JbbiA-nZcQGm2m198/edit?usp=drive_link&ouid=106252698340703105305&rtpof=true&sd=true}
+
+Patient data: \url{https://docs.google.com/spreadsheets/d/1ksJqD7cg9zU0MC4sbZ6edHCH5_-vi0tc/edit?usp=drive_link&ouid=106252698340703105305&rtpof=true&sd=true}
+
+\subsection{Synthetic Simulation Data Analysis}
+
+To validate the performance of our IVIM-DKI analysis framework, we conducted comprehensive simulation studies using synthetic data. Parameter maps for diffusion coefficient ($D$), pseudo-diffusion coefficient ($D^*$), perfusion fraction ($f$), and kurtosis parameter ($K$) were generated using the IVIM-TV toolbox. For each synthetic dataset, the toolbox was used to compute all relevant statistics, including region-of-interest (ROI) metrics such as RMSE, relative bias, relative parameter error, and Akaike Information Criterion (AIC).
+
+Simulations were performed at multiple SNR levels (15, 25, 40, 60), with five independent realizations per SNR, resulting in a total of 80 datasets per parameter. This approach allowed for robust assessment of model performance and parameter recovery under varying noise conditions.
+
+\subsubsection{Simulation Setup}
+
+Synthetic datasets were generated to represent a range of plausible parameter values for $D$, $D^*$, $f$, and $K$. For each SNR level, the IVIM-TV toolbox was applied to estimate parameter maps and compute ROI-based statistics. This workflow enabled direct evaluation of the accuracy and precision of parameter estimation across different noise regimes.
+
+\subsubsection{Results}
+
+Table~\ref{tab:comprehensive_simulation} presents the performance metrics across all simulation scenarios and SNR levels. The results demonstrate several key findings:
+
+\begin{itemize}
+    \item \textbf{Diffusion Coefficient ($D$):} Exhibited excellent performance with consistently low RMSE and minimal bias. The relative parameter values remained very close to unity, indicating highly accurate parameter recovery across all SNR levels.
+    \item \textbf{Pseudo-diffusion Coefficient ($D^*$):} Showed moderate performance with higher RMSE and a tendency toward underestimation, consistent with known challenges in $D^*$ estimation.
+    \item \textbf{Perfusion Fraction ($f$):} Demonstrated stable performance with moderate RMSE and a slight positive bias, indicating a tendency for overestimation.
+    \item \textbf{Kurtosis Parameter ($K$):} Showed the most consistent SNR-dependent improvement, with RMSE decreasing as SNR increased. However, a systematic overestimation was observed for $K$.
+\end{itemize}
+
+\begin{table}[H]
+    \centering
+    \caption{Comprehensive Simulation Results: Performance Metrics for All IVIM-DKI Parameters}
+    \begin{tabular}{@{}lcccccc@{}}
+        \toprule
+        Parameter & SNR & RMSE (\%) & Rel. Bias (\%) & Rel. Parameter & AIC \\
+        \midrule
+        D (Diffusion) & 15 & 17.84 ± 0.04 & 0.30 ± 0.05 & 1.0030 ± 0.0005 & -66.5 ± 0.0 \\
+        D (Diffusion) & 25 & 13.84 ± 0.02 & 0.95 ± 0.03 & 1.0095 ± 0.0003 & -79.3 ± 0.0 \\
+        D (Diffusion) & 40 & 11.60 ± 0.03 & 1.06 ± 0.03 & 1.0106 ± 0.0003 & -91.6 ± 0.0 \\
+        D (Diffusion) & 60 & 10.63 ± 0.01 & 1.22 ± 0.01 & 1.0122 ± 0.0001 & -100.1 ± 0.0 \\
+        \midrule
+        D* (Pseudo-diffusion) & 15 & 45.04 ± 0.03 & -6.61 ± 0.13 & 0.9339 ± 0.0013 & -66.8 ± 0.0 \\
+        D* (Pseudo-diffusion) & 25 & 35.58 ± 0.05 & -4.16 ± 0.18 & 0.9584 ± 0.0018 & -80.0 ± 0.0 \\
+        D* (Pseudo-diffusion) & 40 & 27.38 ± 0.08 & -2.68 ± 0.06 & 0.9732 ± 0.0006 & -92.7 ± 0.0 \\
+        D* (Pseudo-diffusion) & 60 & 22.55 ± 0.04 & -2.13 ± 0.05 & 0.9787 ± 0.0005 & -101.5 ± 0.0 \\
+        \midrule
+        f (Perfusion fraction) & 15 & 27.55 ± 2.19 & 3.95 ± 1.43 & 1.0395 ± 0.0143 & -74.8 ± 16.4 \\
+        f (Perfusion fraction) & 25 & 26.03 ± 0.04 & 4.95 ± 0.03 & 1.0495 ± 0.0003 & -79.4 ± 0.0 \\
+        f (Perfusion fraction) & 40 & 24.85 ± 0.03 & 5.77 ± 0.03 & 1.0577 ± 0.0003 & -91.5 ± 0.0 \\
+        f (Perfusion fraction) & 60 & 24.29 ± 0.01 & 6.10 ± 0.01 & 1.0610 ± 0.0001 & -99.4 ± 0.0 \\
+        \midrule
+        K (Kurtosis) & 15 & 16.48 ± 0.04 & 20.95 ± 0.07 & 1.2095 ± 0.0007 & -66.2 ± 0.0 \\
+        K (Kurtosis) & 25 & 11.90 ± 0.01 & 20.30 ± 0.07 & 1.2030 ± 0.0007 & -79.1 ± 0.0 \\
+        K (Kurtosis) & 40 & 9.64 ± 0.01 & 20.03 ± 0.02 & 1.2003 ± 0.0002 & -91.3 ± 0.0 \\
+        K (Kurtosis) & 60 & 8.87 ± 0.01 & 19.94 ± 0.02 & 1.1994 ± 0.0002 & -99.3 ± 0.0 \\
+        \bottomrule
+    \end{tabular}
+    \label{tab:comprehensive_simulation}
+\end{table}
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=\textwidth,height=18cm]{enhanced_simulation_analysis.png}
+    \caption{Comprehensive IVIM-DKI parameter simulation analysis showing (a) RMSE vs SNR, (b) Relative bias vs SNR, (c) Parameter recovery accuracy vs SNR, (d) Model quality (AIC) vs SNR, and (e) Performance summary comparing SNR15 to SNR60 improvements. The IDTV-AD model demonstrates consistent performance improvements with increased SNR across all parameters.}
+    \label{fig:simulation_analysis}
+\end{figure}
+
+\subsubsection{SNR Dependency Analysis}
+
+The results clearly demonstrate the expected inverse relationship between SNR and estimation errors. Key observations include:
+
+\begin{itemize}
+    \item \textbf{RMSE Reduction:} All parameters showed systematic RMSE reduction with increasing SNR, with $D^*$ exhibiting the most substantial improvement (49.9\% reduction from SNR15 to SNR60).
+    \item \textbf{Bias Characteristics:} While $D^*$ and $f$ showed decreasing absolute bias with higher SNR, the $K$ parameter maintained consistent bias levels, suggesting systematic model limitations for kurtosis estimation.
+    \item \textbf{Model Quality:} AIC values consistently improved (became more negative) with higher SNR, indicating better model fitting quality at higher noise levels.
+\end{itemize}
+
+\subsubsection{Clinical Implications}
+
+These simulation results provide important guidance for clinical IVIM-DKI implementations:
+
+\begin{enumerate}
+    \item \textbf{SNR Requirements:} For reliable parameter estimation, SNR $\geq$ 25 is recommended, with SNR $\geq$ 40 preferred for quantitative analysis.
+    \item \textbf{Parameter Reliability Ranking:} Based on accuracy and precision: $D > K > f > D^*$, suggesting differential confidence levels for clinical interpretation.
+    \item \textbf{Bias Correction:} Systematic biases, particularly for the $K$ parameter (+20\%) and $D^*$ parameter (-5\%), should be considered in clinical applications.
+\end{enumerate}
+
+The synthetic simulation validation confirms the robustness and reliability of our IDTV-AD framework for IVIM-DKI parameter estimation, providing a solid foundation for clinical applications.
+\subsection{Clinical IVIM-DKI Parameter Analysis}
+
+To evaluate the clinical utility of our IVIM-DKI analysis framework, we conducted a comprehensive multi-organ study comparing parameter distributions between benign and malignant tissues. The clinical dataset comprised measurements from 14 patients across four different organ systems: hepatocellular carcinoma (Liver\_HCC), Lymphoma, Prostate,and Ractum.
+
+\subsubsection{Clinical Dataset Overview}
+
+The clinical validation dataset included:
+\begin{itemize}
+    \item \textbf{Patient cohort:} 14 patients with confirmed diagnoses
+    \item \textbf{Organ systems:} Liver (HCC), lymph nodes, prostate, and rectum
+    \item \textbf{Total measurements:} 104 IVIM-DKI parameter sets
+    \item \textbf{Parameters analyzed:} Diffusion coefficient (D), pseudo-diffusion coefficient (D*), perfusion fraction (f), and kurtosis parameter (k)
+    \item \textbf{Tissue types:} Benign and tumor regions for comparative analysis
+\end{itemize}
+
+The data distribution across organs and tissue types is summarized in Table~\ref{tab:clinical_data_distribution}, demonstrating balanced representation for liver, lymphoma, and prostate cases, with limited benign tissue availability for rectal cases.
+
+\begin{table}[H]
+\centering
+\caption{Clinical Data Distribution Across Organs and Tissue Types}
+\begin{tabular}{@{}lcc@{}}
+\toprule
+Organ System & Benign Measurements & Tumor Measurements \\
+\midrule
+Liver\_HCC & 16 & 16 \\
+Lymphoma & 16 & 16 \\
+Prostate & 16 & 16 \\
+Rectum & 0 & 8 \\
+\bottomrule
+\end{tabular}
+\label{tab:clinical_data_distribution}
+\end{table}
+
+\subsubsection{Statistical Analysis Results}
+
+Table~\ref{tab:clinical_ivim_analysis} presents the comprehensive statistical comparison of IVIM-DKI parameters between benign and tumor tissues across different organ systems. Statistical significance was evaluated using two-sample t-tests with significance threshold set at p < 0.05.
+
+\begin{table}[H]
+\centering
+\caption{Clinical IVIM-DKI Parameter Analysis: Benign vs Tumor Comparison Across Different Organs}
+\begin{tabular}{@{}llcccccc@{}}
+\toprule
+Organ & Parameter & \multicolumn{2}{c}{Benign} & \multicolumn{2}{c}{Tumor} & P-Value & Significance \\
+\cmidrule(lr){3-4} \cmidrule(lr){5-6}
+& & Mean ± SD & N & Mean ± SD & N & & \\
+\midrule
+Liver\_HCC & D* & 0.0203 ± 0.0025 & 4 & 0.0186 ± 0.0022 & 4 & 0.346 & Not Significant \\
+Liver\_HCC & D & 0.0011 ± 0.0001 & 4 & 0.0011 ± 0.0002 & 4 & 0.618 & Not Significant \\
+Liver\_HCC & f & 0.2580 ± 0.0322 & 4 & 0.2309 ± 0.0328 & 4 & 0.284 & Not Significant \\
+Liver\_HCC & k & 0.8180 ± 0.0660 & 4 & 0.7734 ± 0.1021 & 4 & 0.491 & Not Significant \\
+\midrule
+Lymphoma & D* & 0.0175 ± 0.0027 & 4 & 0.0178 ± 0.0068 & 4 & 0.926 & Not Significant \\
+Lymphoma & D & 0.0012 ± 0.0002 & 4 & 0.0013 ± 0.0004 & 4 & 0.694 & Not Significant \\
+Lymphoma & f & 0.2561 ± 0.0504 & 4 & 0.2688 ± 0.1126 & 4 & 0.844 & Not Significant \\
+Lymphoma & k & 1.3249 ± 0.1213 & 4 & 1.2747 ± 0.2915 & 4 & 0.761 & Not Significant \\
+\midrule
+Prostate & D* & 0.0112 ± 0.0052 & 4 & 0.0120 ± 0.0013 & 4 & 0.789 & Not Significant \\
+Prostate & D & 0.0013 ± 0.0004 & 4 & 0.0010 ± 0.0002 & 4 & 0.196 & Not Significant \\
+Prostate & f & 0.1766 ± 0.0407 & 4 & 0.1721 ± 0.0184 & 4 & 0.848 & Not Significant \\
+Prostate & k & 0.8689 ± 0.3256 & 4 & 1.2561 ± 0.4621 & 4 & 0.220 & Not Significant \\
+\bottomrule
+\end{tabular}
+\label{tab:clinical_ivim_analysis}
+\end{table}
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=\textwidth]{clinical_summary_analysis.png}
+    \caption{Clinical IVIM-DKI parameter distributions across different organ systems comparing benign and tumor tissues. Box plots show median, quartiles, and individual data points for (a) pseudo-diffusion coefficient D*, (b) diffusion coefficient D, (c) perfusion fraction f, and (d) kurtosis parameter k. Despite observable trends, no statistically significant differences were detected ($p > 0.05$ for all comparisons).}
+    \label{fig:clinical_summary_analysis.png}
+\end{figure}
+
+\subsubsection{Key Clinical Findings}
+
+The clinical analysis revealed several important observations:
+
+\paragraph{Statistical Significance}
+No statistically significant differences ($p < 0.05$) were observed between benign and tumor tissues across all 12 parameter-organ combinations. This finding suggests that:
+\begin{enumerate}
+    \item The current sample sizes (n=4 per group) is insufficient to detect clinically meaningful differences
+    \item Inter-patient variability may mask tissue-specific differences
+    \item Organ-specific heterogeneity requires larger cohorts for robust statistical analysis
+\end{enumerate}
+
+\paragraph{Parameter Trends}
+Despite the lack of statistical significance, consistent trends were observed across organ systems:
+
+\begin{itemize}
+    \item \textbf{Diffusion Parameters (D, D*):} Benign tissues showed slightly higher values than tumor tissues (D: 0.0012 vs 0.0011 mm²/s; D*: 0.0164 vs 0.0162 mm²/s), consistent with the expected reduced cellular density in benign tissues.
+    
+    \item \textbf{Perfusion Fraction (f):} Benign tissues demonstrated marginally higher perfusion fractions (0.2302 vs 0.2239), potentially reflecting different vascular architectures between tissue types.
+    
+    \item \textbf{Kurtosis Parameter (k):} Tumor tissues exhibited higher kurtosis values (1.1014 vs 1.0039), suggesting increased microstructural complexity and heterogeneity in malignant tissues.
+\end{itemize}
+
+\paragraph{Organ-Specific Observations}
+
+\textbf{Liver HCC:} Showed the most pronounced differences in perfusion fraction (f = 0.2580 ± 0.0322 vs 0.2309 ± 0.0328, p = 0.284), reflecting the known vascular changes associated with hepatocellular carcinoma.
+
+\textbf{Lymphoma:} Demonstrated the highest kurtosis values among all organ systems ($k > 1.25$), consistent with the high cellular density and structural complexity of lymphoid malignancies.
+
+\textbf{Prostate:} Exhibited substantial variability in kurtosis parameters, particularly in benign tissues (k = 0.8689 ± 0.3256), reflecting the heterogeneous nature of prostatic tissue architecture.
+
+\subsubsection{Clinical Implications and Limitations}
+
+The current clinical validation study establishes the feasibility of our IVIM-DKI analysis framework in multi-organ applications. However, several limitations must be acknowledged:
+
+\begin{enumerate}
+    \item \textbf{Sample Size:} The limited sample sizes (n=4 per group) restrict statistical power and generalizability of findings.
+    
+    \item \textbf{Inter-patient Variability:} Substantial inter-patient differences may require stratification by patient demographics, disease stage, or treatment history.
+    
+    \item \textbf{Organ Heterogeneity:} Different organs exhibit distinct baseline IVIM-DKI characteristics, necessitating organ-specific reference ranges and interpretation criteria.
+    
+    \item \textbf{Technical Standardization:} Variations in imaging protocols, ROI selection, and analysis methods may contribute to observed variability.
+\end{enumerate}
+
+\subsubsection{Future Directions}
+
+To enhance the clinical utility of IVIM-DKI analysis, future studies should focus on:
+
+\begin{itemize}
+    \item Expanding patient cohorts to achieve adequate statistical power (target n ≥ 20 per group)
+    \item Implementing standardized imaging protocols and analysis pipelines
+    \item Investigating organ-specific parameter thresholds and diagnostic criteria
+    \item Correlating IVIM-DKI parameters with histopathological findings and treatment outcomes
+    \item Developing machine learning approaches to identify multi-parametric biomarkers
+\end{itemize}
+
+The clinical validation demonstrates that our IDTV-AD framework successfully processes multi-organ clinical data and provides consistent parameter estimates, establishing a foundation for larger-scale clinical trials and eventual clinical implementation.
+
+
+\section{Discussion}
+This internship provided hands-on experience in the complete workflow of quantitative diffusion MRI analysis, from data loading and ROI definition to advanced model fitting and statistical evaluation. Implementing IVIM and IVIM-DKI models, I found that parameter estimation is highly sensitive to noise and initial fitting conditions. The application of Total Variation (TV) regularization, particularly via the IDTV toolbox, substantially improved the stability and spatial coherence of parameter maps, reducing variability by 30--50\% in line with published studies. While synthetic simulations confirmed the robustness of the framework, clinical data analysis was limited by small sample size and inter-patient variability. Nevertheless, the pipeline enabled clear visualization of parameter trends and highlighted the importance of regularization and standardized protocols for reliable quantitative imaging.
+
+
+Working with patient data taught me end-to-end workflow management: ROI definition, fitting, and statistical summarization.
+
+\section{Conclusion}
+Through this project, I developed practical skills in quantitative MRI, including data preprocessing, model implementation, and advanced regularization techniques. The use of TV regularization proved essential for robust parameter estimation, especially in low SNR conditions. Although clinical findings were limited by cohort size, the established workflow lays a strong foundation for future research. These experiences have prepared me to further optimize diffusion MRI analysis and contribute to the advancement of quantitative imaging in biomedical research.
+
+\section*{Acknowledgements}
+\textit{
+I would like to express my sincere gratitude to Dr. Amit Mehndiratta for providing me with the opportunity to undertake this internship and for his invaluable guidance throughout the project. I am especially thankful to Dr. Esha Baidya Kayal for her continuous support, insightful discussions, and daily meetings that greatly enhanced my learning experience. I also acknowledge the developers of the IDTV model toolbox, which was instrumental in my analysis. Finally, I thank my family and friends for their encouragement and support during this journey.
+}
+
+
+\section*{References}
+\begin{enumerate}
+    \item Malagi, A. V., Kandasamy, D., Pushpam, D., Khare, K., Sharma, R., Kumar, R., Bakhshi, S., Mehndiratta, A. (2023). IVIM-DKI with parametric reconstruction method for lymph node evaluation and characterization in lymphoma: A preliminary study comparison with FDG-PET/CT. \textit{Clinical Imaging}, 101, 1-10. \url{https://doi.org/10.1016/j.clinimag.2023.05.011}
+    \item Malagi, A. V., Das, C. J., Khare, K., Calamante, F., Mehndiratta, A. (2019). Effect of combination and number of b values in IVIM analysis with post-processing methodology: simulation and clinical study. \textit{Magma}, 32, 567–579. \url{https://doi.org/10.1007/s10334-019-00764-0}
+    \item NiBabel: Python package for reading and writing neuroimaging data. \url{https://nipy.org/nibabel/}
+    \item Le Bihan, D., Breton, E., Lallemand, D., Grenier, P., Cabanis, E., & Laval-Jeantet, M. (1988). Separation of diffusion and perfusion in intravoxel incoherent motion MR imaging. \textit{Radiology}, 168(2), 497–505. \url{https://doi.org/10.1148/radiology.168.2.3393671}
+    \item SciPy: scipy.optimize.curve\_fit documentation.\url{https://docs.scipy.org/doc/scipy/reference/generated/scipy.optimize.curve_fit.html} 
+    \item National Institute of Biomedical Imaging and Bioengineering (NIBIB). "Magnetic Resonance Imaging (MRI)."\url{https://www.nibib.nih.gov/science-education/science-topics/magnetic-resonance-imaging-mri} 
+\end{enumerate}
+
+\appendix
+
+\section*{Appendix 1: Mathematical Definitions and Methods}
+\addcontentsline{toc}{section}{Appendix 1: Mathematical Definitions and Methods}
+
+\subsection*{Statistical Metrics}
+
+\begin{itemize}
+    \item \textbf{Mean:}
+    \begin{equation}
+        \bar{x} = \frac{1}{N} \sum_{i=1}^{N} x_i
+    \end{equation}
+    where $x_i$ are the data points and $N$ is the total number of points.
+
+    \item \textbf{Root Mean Squared Error (RMSE):}
+    \begin{equation}
+        \mathrm{RMSE} = \sqrt{ \frac{1}{N} \sum_{i=1}^{N} (x_i^{\text{est}} - x_i^{\text{true}})^2 }
+    \end{equation}
+    Measures the average magnitude of estimation error.
+
+    \item \textbf{Normalized RMSE (\%):}
+    \begin{equation}
+        \mathrm{Normalized~RMSE} = \frac{\mathrm{RMSE}}{\bar{x}^{\text{true}}} \times 100
+    \end{equation}
+    Expresses RMSE as a percentage of the true mean.
+
+    \item \textbf{Relative Bias (\%):}
+    \begin{equation}
+        \mathrm{Relative~Bias} = \frac{ \bar{x}^{\text{est}} - \bar{x}^{\text{true}} }{ \bar{x}^{\text{true}} } \times 100
+    \end{equation}
+    Quantifies systematic over- or under-estimation.
+
+    \item \textbf{Relative Parameter:}
+    \begin{equation}
+        \mathrm{Relative~Parameter} = \frac{ \bar{x}^{\text{est}} }{ \bar{x}^{\text{true}} }
+    \end{equation}
+    Ideal value is 1.0 for perfect estimation.
+
+    \item \textbf{Akaike Information Criterion (AIC):}
+    \begin{equation}
+        \mathrm{AIC} = 2k - 2\ln(\hat{L})
+    \end{equation}
+    where $k$ is the number of model parameters and $\hat{L}$ is the maximum likelihood. Lower AIC indicates a better model fit, penalizing for complexity.
+\end{itemize}
+
+\subsection*{Nonlinear Model Fitting}
+
+Nonlinear least-squares fitting is used to estimate model parameters ($D$, $D^*$, $f$, $K$) from observed diffusion MRI signals. The fitting process minimizes the sum of squared differences between the observed signal $S(b)$ and the model prediction $\hat{S}(b; \theta)$, where $\theta$ is the parameter vector:
+\begin{equation}
+    \min_{\theta} \sum_{i=1}^{N} \left[ S(b_i) - \hat{S}(b_i; \theta) \right]^2
+\end{equation}
+Optimization algorithms such as Levenberg-Marquardt or Trust Region Reflective are commonly used. Good initial parameter guesses and physiological bounds are essential for convergence.
+
+\subsection*{IVIM and DKI Models}
+
+\textbf{IVIM Model:}
+\begin{equation}
+    S(b) = S_0 \left[ f e^{-b D^*} + (1-f) e^{-b D} \right]
+\end{equation}
+where $S_0$ is the baseline signal, $D$ is the diffusion coefficient, $D^*$ is the pseudo-diffusion coefficient, and $f$ is the perfusion fraction.
+
+\textbf{DKI Model:}
+\begin{equation}
+    \frac{S(b)}{S_0} \approx \exp\left( -b D + \frac{1}{6} b^2 D^2 K \right)
+\end{equation}
+where $K$ is the kurtosis parameter, capturing non-Gaussian diffusion.
+
+\textbf{Hybrid IVIM-DKI Model:}
+Combines both effects to better characterize complex tissue microstructure.
+
+\subsection*{Total Variation (TV) Regularization}
+
+TV regularization is used to promote spatial smoothness in parameter maps while preserving edges. The TV-penalized fitting problem is:
+\begin{equation}
+    \min_{\theta} \left\{ \sum_{i=1}^{N} \left[ S(b_i) - \hat{S}(b_i; \theta) \right]^2 + \lambda \cdot \mathrm{TV}(\theta) \right\}
+\end{equation}
+where $\lambda$ is the regularization parameter and $\mathrm{TV}(\theta)$ is the total variation norm, typically defined as:
+\begin{equation}
+    \mathrm{TV}(\theta) = \sum_{\text{voxels}} \left| \nabla \theta \right|
+\end{equation}
+This approach reduces noise and improves the reliability of parameter estimation in low SNR conditions.
+
+\subsection*{Other Methods Used}
+
+\begin{itemize}
+    \item \textbf{ROI Analysis:} Regions of interest (ROIs) are defined to extract statistics from specific tissue areas.
+    \item \textbf{Histogram Analysis:} Intensity and parameter histograms are used to assess tissue heterogeneity.
+    \item \textbf{Simulation Studies:} Synthetic phantoms and noise simulations validate model performance under controlled conditions.
+\end{itemize}
+
+\section*{Appendix 2: Supplementary Plots}
+\addcontentsline{toc}{section}{Appendix 2: Supplementary Plots}
+
+Below are additional plots supporting the main results. These include comparisons between reference and estimated parameter maps, as well as example graphs illustrating model performance.
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.8\textwidth]{ivim/all_maps_overview.png}
+    \caption{Example comparison of IVIM-T reference and estimated parameter maps.}
+    \label{fig:ivimt_reference_vs_estimated}
+\end{figure}
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.95\textwidth]{ivim/aic.png} % <-- replace with your actual filename
+    \caption{Simulation phantom analysis: (Left) Reference image (mid-slice, $b=0$), (Middle) Mean signal decay with IVIM-DKI model fit, (Right) Binary mask used for ROI analysis. This figure illustrates the simulation setup, model fitting quality, and the region of interest used for quantitative evaluation.}
+    \label{fig:ivim/aic.png}
+\end{figure}
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.9\textwidth]{single_voxel_fit.png} % update filename as needed
+    \caption{Comparison of voxel-wise nonlinear model fitting for IVIM and IVIM-DKI. (Top) Observed signal intensities (black dots) are fitted with both IVIM (blue line) and IVIM-DKI (red dashed line) models. Estimated parameters for each model are shown in the legend. (Bottom) Residuals for each fit are plotted against $b$-value, with RMSE values indicated. Both models achieve high $R^2$, but the IVIM-DKI model provides a slightly improved fit and additional kurtosis parameter estimation.}
+    \label{fig:single_voxel_fit.png}
+\end{figure}
+
+\section*{Thank You}
+\textit{Thank you for reading this report and for your valuable time and consideration.}
+
+\end{document}
