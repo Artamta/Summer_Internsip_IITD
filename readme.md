@@ -1,20 +1,23 @@
+> 📄 **Curious for more? Dive into the full technical report:** [report.pdf](report.pdf)
+
 # Voxel‑Wise IVIM / IVIM‑DKI Modeling with Total Variation Regularization
 
 **Indian Institute of Technology Delhi**  
-Centre for Biomedical Engineering  
+_Centre for Biomedical Engineering_  
 **Summer Research Internship (July 2025)**  
 **Author:** Ayush Raj  
 **Supervisors:** Dr. Amit Mehndiratta, Dr. Esha Baidya Kayal
 
 ---
 
-## Abstract
+## 📝 Abstract
 
-This repository presents the outcomes of my remote summer internship at CBME, IIT Delhi, focused on advanced quantitative MRI analysis. The primary objective was to implement and evaluate voxel-wise bi-exponential (IVIM) and hybrid IVIM-DKI models for diffusion-weighted imaging, with robust parameter estimation using Total Variation (TV) regularization. The workflow covers data I/O (DICOM/NIfTI), ROI selection, nonlinear least-squares fitting, synthetic simulations across SNR levels, and quantitative evaluation using RMSE, bias, and AIC. TV regularization substantially improves the consistency and reliability of parameter maps, especially under low SNR conditions.
+Welcome to the code and results from my summer research internship at CBME, IIT Delhi!  
+This project dives into advanced quantitative MRI, implementing voxel-wise bi-exponential (IVIM) and hybrid IVIM-DKI models for diffusion-weighted imaging. I focused on robust parameter estimation using Total Variation (TV) regularization—making parameter maps more reliable, especially in noisy clinical data.
 
 ---
 
-## Table of Contents
+## 📚 Table of Contents
 
 - [Introduction](#introduction)
 - [Motivation](#motivation)
@@ -30,89 +33,115 @@ This repository presents the outcomes of my remote summer internship at CBME, II
 
 ---
 
-## Introduction
+## 🌟 Introduction
 
-Diffusion MRI is a crucial noninvasive method for probing tissue microstructure. IVIM MRI uses multi–b-value diffusion-weighted acquisitions to separate true molecular diffusion from microvascular perfusion effects. The IVIM bi-exponential model enables simultaneous quantification of diffusion and perfusion without contrast agents. DKI extends the mono-exponential model by adding a kurtosis term to capture non-Gaussian diffusion. Hybrid IVIM-DKI models combine these concepts to capture perfusion, diffusion, and kurtosis in a single framework.
+Diffusion MRI is a powerful, noninvasive tool for probing tissue microstructure.
 
----
-
-## Motivation
-
-Quantitative diffusion MRI modeling, particularly using advanced techniques such as IVIM-DKI with TV regularization, represents a cutting-edge approach in biomedical imaging. This work contributes to the advancement of noninvasive diagnostics and precision medicine in India.
+- **IVIM MRI**: Separates true molecular diffusion from microvascular perfusion using multi–b-value imaging.
+- **DKI**: Adds a kurtosis term to capture non-Gaussian diffusion.
+- **Hybrid IVIM-DKI**: Combines both for richer tissue characterization.
 
 ---
 
-## Literature Review
+## 🚀 Motivation
 
-- **IVIM Model:** Quantifies perfusion without contrast agents, though D\* often exhibits high voxel-wise variability.
-- **DKI Model:** Extends the mono-exponential model by introducing a kurtosis parameter.
-- **Hybrid IVIM-DKI:** Leverages both low- and high-b value information for improved tissue differentiation.
-- **Total Variation Regularization:** Promotes spatial smoothness in parameter maps by penalizing large differences between neighboring voxels.
+Why does this matter?  
+Quantitative diffusion MRI modeling—especially with TV regularization—pushes the boundaries of biomedical imaging.  
+It’s about making diagnostics more robust, reproducible, and clinically useful.
 
 ---
 
-## Methodology
+## 🔬 Literature Review
+
+- **IVIM Model:** Quantifies perfusion without contrast agents, but D\* can be noisy.
+- **DKI Model:** Captures non-Gaussian diffusion via kurtosis.
+- **Hybrid IVIM-DKI:** Uses both low- and high-b value data for better tissue differentiation.
+- **TV Regularization:** Smooths parameter maps, preserving anatomical edges.
+
+---
+
+## 🛠️ Methodology
 
 ### Data Loading and Preprocessing
 
-MRIcron was used to load DICOM/NIfTI images and define ROIs. In Python, NiBabel imported NIfTI files into NumPy arrays, and SimpleITK performed conversions and resampling.
+- **MRIcron** for ROI selection.
+- **NiBabel & SimpleITK** for DICOM/NIfTI handling in Python.
 
-**Figure 1: ROI Selection Workflow**  
 ![ROI Selection](Results/add_plts/methodology.png)
-
-### Histogram and ROI Analysis
-
-Intensity histograms and kernel density estimates were computed for tumor ROIs. ROI masks generated in MRIcron were used to extract voxel intensities, enabling calculation of summary statistics for both raw signal and fitted parameters.
-
-**Figure 2: Frequency vs. Intensity Histogram**  
-![Histogram](Results/add_plts/histogram.png)
-
-### Visualization
-
-Single-slice visualizations from a randomly selected Liver HCC dataset were generated using Matplotlib.
-
-**Figure 3: Example Slice Visualization**  
-![Slice](Results/add_plts/crosssection.png)
-
-### Nonlinear Model Fitting
-
-Voxel-wise nonlinear least-squares fitting of IVIM and IVIM-DKI models was implemented using `scipy.optimize.curve_fit` and `lmfit`. Both Levenberg-Marquardt and trust-region reflective algorithms were tested.
-
-### Synthetic Phantom Generation
-
-A 2D bulls-eye phantom with concentric parameter regions was created in NumPy to serve as a synthetic test case for model validation. Composite visualization shows the reference, estimated, mask, and masked results.
-
-**Figure 4: Phantom Composite Visualization**  
-![Phantom Composite](Results/add_plts/digifantom.png)
-
-### Custom IVIM-Hybrid Model
-
-Custom implementations of IVIM and hybrid IVIM-DKI models were developed and compared against the IDTV toolbox.
-
-**Figure 5: Parameter Map Comparison**  
-![Parameter Comparison](Results/add_plts/parammaps.png)
-
-### Total Variation Regularization
-
-The IDTV model toolbox was used for TV-regularized fitting and statistical analysis.
-
-**Figure 6: IDTV Toolbox Interface**  
-![IDTV Toolbox](Results/add_plts/toolbox.png)
-
-### SNR Simulations
-
-Simulations were conducted using synthetic data generated at different SNR levels (15, 25, 40, 60).
+_Figure 1: ROI Selection Workflow_
 
 ---
 
-## Results
+### Histogram and ROI Analysis
+
+- Computed intensity histograms and kernel density estimates for tumor ROIs.
+- Used MRIcron masks for extracting voxel statistics.
+
+![Histogram](Results/add_plts/histogram.png)
+_Figure 2: Frequency vs. Intensity Histogram_
+
+---
+
+### Visualization
+
+- Visualized single slices from Liver HCC datasets using Matplotlib.
+
+![Slice](Results/add_plts/crosssection.png)
+_Figure 3: Example Slice Visualization_
+
+---
+
+### Nonlinear Model Fitting
+
+- Voxel-wise nonlinear least-squares fitting (`scipy.optimize.curve_fit`, `lmfit`).
+- Tested Levenberg-Marquardt and trust-region reflective algorithms.
+
+---
+
+### Synthetic Phantom Generation
+
+- Created a 2D bulls-eye phantom in NumPy for validation.
+- Composite visualizations show reference, estimated, mask, and masked results.
+
+![Phantom Composite](Results/add_plts/digifantom.png)
+_Figure 4: Phantom Composite Visualization_
+
+---
+
+### Custom IVIM-Hybrid Model
+
+- Developed custom IVIM and IVIM-DKI implementations.
+- Compared results with the IDTV toolbox.
+
+![Parameter Comparison](Results/add_plts/parammaps.png)
+_Figure 5: Parameter Map Comparison_
+
+---
+
+### Total Variation Regularization
+
+- Used the IDTV toolbox for TV-regularized fitting and analysis.
+
+![IDTV Toolbox](Results/add_plts/toolbox.png)
+_Figure 6: IDTV Toolbox Interface_
+
+---
+
+### SNR Simulations
+
+- Ran simulations at SNR levels 15, 25, 40, 60 to test robustness.
+
+---
+
+## 📊 Results
 
 ### Synthetic Simulation Data Analysis
 
-Parameter maps for diffusion coefficient (D), pseudo-diffusion coefficient (D\*), perfusion fraction (f), and kurtosis parameter (K) were generated using the IVIM-TV toolbox. For each synthetic dataset, ROI-based statistics were computed.
+- Generated parameter maps for D, D\*, f, and K using the IVIM-TV toolbox.
+- Computed ROI-based statistics for each synthetic dataset.
 
-**Figure 7: IVIM-DKI Parameter Simulation Analysis**  
 ![Simulation Analysis](Results/add_plts/simulation_analysis.png)
+_Figure 7: IVIM-DKI Parameter Simulation Analysis_
 
 #### Table 1: Simulation Results Summary
 
@@ -139,10 +168,10 @@ Parameter maps for diffusion coefficient (D), pseudo-diffusion coefficient (D\*)
 
 ### Clinical IVIM-DKI Parameter Analysis
 
-A multi-organ study compared parameter distributions between benign and malignant tissues.
+- Compared parameter distributions between benign and malignant tissues across multiple organs.
 
-**Figure 8: Clinical Parameter Distributions**  
 ![Clinical Boxplots](Results/add_plts/results.png)
+_Figure 8: Clinical Parameter Distributions_
 
 #### Table 2: Clinical Data Summary
 
@@ -155,19 +184,23 @@ A multi-organ study compared parameter distributions between benign and malignan
 
 ---
 
-## Discussion
+## 💡 Discussion
 
-This internship provided hands-on experience in the complete workflow of quantitative diffusion MRI analysis, from data loading and ROI definition to advanced model fitting and statistical evaluation. TV regularization substantially improved the stability and spatial coherence of parameter maps, reducing variability by 30–50%. While synthetic simulations confirmed the robustness of the framework, clinical data analysis was limited by small sample size and inter-patient variability.
-
----
-
-## Conclusion
-
-Through this project, I developed practical skills in quantitative MRI, including data preprocessing, model implementation, and advanced regularization techniques. The use of TV regularization proved essential for robust parameter estimation, especially in low SNR conditions. The established workflow lays a strong foundation for future research.
+This internship gave me hands-on experience in the full workflow of quantitative diffusion MRI analysis—from data loading and ROI definition to advanced model fitting and statistical evaluation.  
+TV regularization improved the stability and spatial coherence of parameter maps, reducing variability by 30–50%.  
+Synthetic simulations confirmed the robustness of the framework, though clinical data analysis was limited by sample size and inter-patient variability.
 
 ---
 
-## References
+## 🏁 Conclusion
+
+I developed practical skills in quantitative MRI, including data preprocessing, model implementation, and advanced regularization techniques.  
+TV regularization proved essential for robust parameter estimation, especially in low SNR conditions.  
+This workflow lays a strong foundation for future research and clinical translation.
+
+---
+
+## 📚 References
 
 1. Malagi, A. V., et al. (2023). IVIM‑DKI with parametric reconstruction… Clinical Imaging 101. [doi](https://doi.org/10.1016/j.clinimag.2023.05.011)
 2. Malagi, A. V., et al. (2019). Effect of combination and number of b values… MAGMA 32, 567–579. [doi](https://doi.org/10.1007/s10334-019-00764-0)
@@ -178,7 +211,7 @@ Through this project, I developed practical skills in quantitative MRI, includin
 
 ---
 
-## Acknowledgements
+## 🙏 Acknowledgements
 
 - Centre for Biomedical Engineering, IIT Delhi
 - Dr. Amit Mehndiratta, Dr. Esha Baidya Kayal
@@ -186,7 +219,7 @@ Through this project, I developed practical skills in quantitative MRI, includin
 
 ---
 
-## Appendix
+## 📎 Appendix
 
 ### Additional Figures
 
@@ -196,6 +229,8 @@ Through this project, I developed practical skills in quantitative MRI, includin
 **Figure A2: Additional Results**  
 ![Additional Results](Results/add_plts/voxelvsivim.png)
 ![Clinical Comparison](Results/add_plts/clinical.png)
+
+---
 
 ### Additional Tables
 
@@ -218,13 +253,13 @@ Through this project, I developed practical skills in quantitative MRI, includin
 
 ---
 
-## Contact
+## 📬 Contact
 
 Ayush Raj — Research Intern, CBME, IIT Delhi  
 Code: [GitHub Python methods](https://github.com/Artamta/Summer_Internsip_IITD/tree/main/python)
 
 ---
 
-## Thank You
+## 🎉 Thank You
 
 Thank you for your interest in this project and for your valuable time and consideration.
