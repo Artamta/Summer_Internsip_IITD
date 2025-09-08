@@ -1,0 +1,10 @@
+numpy
+scipy
+matplotlib
+seaborn
+nibabel
+simpleitk
+lmfit
+scikit-image
+pandas
+tqdm
