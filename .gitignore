@@ -23,7 +23,6 @@ dist/
 
 # Project data/output you don't want in Git
 /Datasets/
-/Results/
 /Output_Statistics/
 /Output_Parameter_Maps/
 /IVIM/
